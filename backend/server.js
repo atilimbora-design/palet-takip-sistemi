@@ -150,6 +150,20 @@ app.delete('/api/pallets/:id', (req, res) => {
     });
 });
 
+// 6. Update Pallet
+app.put('/api/pallets/:id', (req, res) => {
+    const { id } = req.params;
+    const { firm_name, pallet_type, box_count, vehicle_plate, note } = req.body;
+
+    const sql = `UPDATE pallets SET firm_name = ?, pallet_type = ?, box_count = ?, vehicle_plate = ?, note = ? WHERE local_id = ?`;
+
+    db.run(sql, [firm_name, pallet_type, box_count, vehicle_plate, note, id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) return res.status(404).json({ error: 'Pallet not found' });
+        res.json({ message: 'Updated successfully', id: id });
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Network: http://192.168.1.104:${PORT}/api`);

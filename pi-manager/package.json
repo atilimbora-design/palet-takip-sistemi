@@ -1,0 +1,14 @@
+{
+    "name": "pi-manager",
+    "version": "1.0.0",
+    "description": "Dashboard to manage Raspberry Pi Backend",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "express": "^4.18.2",
+        "socket.io": "^4.7.2",
+        "ssh2": "^1.14.0"
+    }
+}

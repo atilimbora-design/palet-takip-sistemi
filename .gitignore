@@ -1,0 +1,9 @@
+node_modules/
+.dart_tool/
+build/
+.pub/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.db
+*.log
+.DS_Store

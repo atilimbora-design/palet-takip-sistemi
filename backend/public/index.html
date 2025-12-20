@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atılım Gıda - Palet Takip Merkezi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --accent: #3b82f6;
+            --green: #22c55e;
+            --orange: #f97316;
+            --danger: #ef4444;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #334155;
+        }
+
+        h1 {
+            margin: 0;
+            font-weight: 700;
+            background: linear-gradient(to right, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .live-badge {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--green);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            }
+
+            70% {
+                opacity: 0;
+                box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+        /* KPI Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid #334155;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .card-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .value-sub {
+            font-size: 1rem;
+            color: var(--green);
+            margin-left: 5px;
+        }
+
+        /* Charts */
+        .charts-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-box {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #334155;
+        }
+
+        /* Recent Table */
+        .table-container {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #334155;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #334155;
+        }
+
+        th {
+            color: #94a3b8;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background-color: #334155;
+        }
+
+        .type-badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .type-tahta {
+            background: rgba(249, 115, 22, 0.2);
+            color: var(--orange);
+        }
+
+        .type-plastik {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent);
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .status-in {
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--green);
+            border: 1px solid var(--green);
+        }
+
+        .status-out {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <div>
+                <h1>PALET TAKİP MERKEZİ</h1>
+                <span style="color: #94a3b8; font-size: 0.9rem;">Anlık Veri Akışı</span>
+            </div>
+            <div class="live-badge">
+                <div class="live-dot"></div> CANLI
+            </div>
+        </header>
+
+        <!-- KPI STATS -->
+        <div class="stats-grid">
+            <div class="card">
+                <div class="card-title">Toplam Palet (Stok)</div>
+                <div class="card-value" id="kpi-stock">0</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Toplam Koli</div>
+                <div class="card-value" id="kpi-boxes">0</div>
+            </div>
+            <div class="card">
+                <div class="card-title">İadeler (Çıkış)</div>
+                <div class="card-value" id="kpi-returns" style="color: var(--danger)">0</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Bugün İşlem</div>
+                <div class="card-value" id="kpi-today">0</div>
+            </div>
+        </div>
+
+        <!-- CHARTS -->
+        <div class="charts-container">
+            <div class="chart-box">
+                <div class="card-title">Son 7 Gün Hareketliliği</div>
+                <canvas id="barChart" height="150"></canvas>
+            </div>
+            <div class="chart-box">
+                <div class="card-title">Stok Dağılımı (Tahta/Plastik)</div>
+                <canvas id="doughnutChart" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="table-container">
+            <div class="card-title" style="margin-bottom: 15px;">Son Hareketler</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Zaman</th>
+                        <th>Firma</th>
+                        <th>Tip</th>
+                        <th>Koli / Durum</th>
+                        <th>Plaka</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-table">
+                    <!-- Data will fill here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // --- CHART INSTANCES ---
+        let barChartInstance = null;
+        let doughnutInstance = null;
+
+        async function fetchData() {
+            try {
+                const res = await fetch('/api/pallets');
+                const json = await res.json();
+                const data = json.data;
+                updateUI(data);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function updateUI(data) {
+            // 1. KPI COUNTS
+            const inStock = data.filter(r => r.status === 'IN_STOCK');
+            const returns = data.filter(r => r.status === 'RETURNED');
+            const today = new Date().toISOString().split('T')[0];
+            const todayCount = data.filter(r => r.entry_date === today).length;
+            const totalBoxes = inStock.reduce((sum, r) => sum + (r.box_count || 0), 0);
+
+            animateValue("kpi-stock", inStock.length);
+            animateValue("kpi-boxes", totalBoxes);
+            animateValue("kpi-returns", returns.length);
+            animateValue("kpi-today", todayCount);
+
+            // 2. RECENT TABLE
+            const tbody = document.getElementById('recent-table');
+            tbody.innerHTML = '';
+            data.slice(0, 8).forEach(r => {
+                const typeClass = r.pallet_type === 'Tahta' ? 'type-tahta' : 'type-plastik';
+                const statusBadge = r.status === 'IN_STOCK'
+                    ? `<span class="status-badge status-in">GİRİŞ (${r.box_count})</span>`
+                    : `<span class="status-badge status-out">İADE</span>`;
+
+                const row = `
+                <tr>
+                    <td style="color: #94a3b8">${r.entry_date}</td>
+                    <td style="font-weight: bold;">${r.firm_name}</td>
+                    <td><span class="type-badge ${typeClass}">${r.pallet_type}</span></td>
+                    <td>${statusBadge}</td>
+                    <td style="font-family: monospace;">${r.vehicle_plate}</td>
+                </tr>
+            `;
+                tbody.innerHTML += row;
+            });
+
+            // 3. CHARTS
+            updateCharts(inStock);
+        }
+
+        function updateCharts(inStock) {
+            // Doughnut Data
+            const wood = inStock.filter(r => r.pallet_type === 'Tahta').length;
+            const plastic = inStock.filter(r => r.pallet_type === 'Plastik').length;
+
+            // Bar Data (Group by Firm)
+            const firmMap = {};
+            inStock.forEach(r => {
+                firmMap[r.firm_name] = (firmMap[r.firm_name] || 0) + 1;
+            });
+            const labels = Object.keys(firmMap);
+            const values = Object.values(firmMap);
+
+            const ctxDoughnut = document.getElementById('doughnutChart').getContext('2d');
+            const ctxBar = document.getElementById('barChart').getContext('2d');
+
+            if (doughnutInstance) doughnutInstance.destroy();
+            doughnutInstance = new Chart(ctxDoughnut, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Tahta', 'Plastik'],
+                    datasets: [{
+                        data: [wood, plastic],
+                        backgroundColor: ['#f97316', '#3b82f6'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } } }
+            });
+
+            if (barChartInstance) barChartInstance.destroy();
+            barChartInstance = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Palet Sayısı',
+                        data: values,
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function animateValue(id, end) {
+            const obj = document.getElementById(id);
+            const start = parseInt(obj.innerText);
+            if (start === end) return;
+            let current = start;
+            const range = end - start;
+            const step = end > start ? 1 : -1;
+            const timer = setInterval(() => {
+                current += step;
+                obj.innerText = current;
+                if (current === end) clearInterval(timer);
+            }, 20);
+        }
+
+        // Auto Refresh every 5 seconds
+        fetchData();
+        setInterval(fetchData, 5000);
+
+    </script>
+</body>
+
+</html>

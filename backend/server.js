@@ -10,6 +10,7 @@ const PORT = 3000;
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.static('public')); // Serve the dashboard
 
 // Routes
 

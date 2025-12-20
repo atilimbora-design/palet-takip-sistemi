@@ -395,16 +395,32 @@
 
         function animateValue(id, end) {
             const obj = document.getElementById(id);
-            const start = parseInt(obj.innerText);
+            // Start from huge numbers quickly
+            const duration = 1500; // Max 1.5 seconds
+            const start = parseInt(obj.innerText.replace(/,/g, '')) || 0;
+
             if (start === end) return;
-            let current = start;
+
             const range = end - start;
-            const step = end > start ? 1 : -1;
-            const timer = setInterval(() => {
-                current += step;
-                obj.innerText = current;
-                if (current === end) clearInterval(timer);
-            }, 20);
+            let startTime = null;
+
+            function step(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const progress = Math.min((timestamp - startTime) / duration, 1);
+
+                // Easing function (easeOutQuad) for smooth effect
+                const ease = 1 - (1 - progress) * (1 - progress);
+
+                const current = Math.floor(start + (range * ease));
+                obj.innerText = current.toLocaleString('tr-TR'); // Add thousand separators
+
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerText = end.toLocaleString('tr-TR');
+                }
+            }
+            window.requestAnimationFrame(step);
         }
 
         // Auto Refresh every 5 seconds

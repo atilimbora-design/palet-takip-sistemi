@@ -140,6 +140,16 @@ app.post('/api/return', (req, res) => {
     });
 });
 
+// 5. Delete Pallet
+app.delete('/api/pallets/:id', (req, res) => {
+    const { id } = req.params;
+    db.run("DELETE FROM pallets WHERE local_id = ?", [id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) return res.status(404).json({ error: 'Pallet not found' });
+        res.json({ message: 'Deleted successfully', id: id });
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Network: http://192.168.1.104:${PORT}/api`);

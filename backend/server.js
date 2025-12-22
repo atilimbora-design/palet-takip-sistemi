@@ -48,7 +48,8 @@ app.post('/api/sync', (req, res) => {
     let successCount = 0;
     let errors = [];
 
-    const stmt = db.prepare(`INSERT OR IGNORE INTO pallets (local_id, firm_name, pallet_type, box_count, vehicle_plate, entry_date, note, status, is_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    // Use INSERT OR REPLACE to ensure status updates (e.g. reverting a return to in_stock) are applied
+    const stmt = db.prepare(`INSERT OR REPLACE INTO pallets (local_id, firm_name, pallet_type, box_count, vehicle_plate, entry_date, note, status, is_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
     db.serialize(() => {
         db.run("BEGIN TRANSACTION");

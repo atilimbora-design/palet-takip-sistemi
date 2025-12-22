@@ -345,7 +345,7 @@
             const woodTotal = inStock.filter(r => r.pallet_type === 'Tahta').length;
             const plasticTotal = inStock.filter(r => r.pallet_type === 'Plastik').length;
 
-            // Bar Data (Group by Firm -> Split by Type)
+            // Bar Data
             const firms = [...new Set(inStock.map(r => r.firm_name))];
             const woodData = [];
             const plasticData = [];
@@ -356,66 +356,83 @@
                 plasticData.push(firmRecords.filter(r => r.pallet_type === 'Plastik').length);
             });
 
-            const ctxDoughnut = document.getElementById('doughnutChart').getContext('2d');
-            const ctxBar = document.getElementById('barChart').getContext('2d');
+            // 1. DOUGHNUT CHART UPDATE
+            const doughnutData = {
+                labels: ['Tahta', 'Plastik'],
+                datasets: [{
+                    data: [woodTotal, plasticTotal],
+                    backgroundColor: ['#f97316', '#3b82f6'],
+                    borderWidth: 0
+                }]
+            };
 
-            // 1. DOUGHNUT CHART
-            if (doughnutInstance) doughnutInstance.destroy();
-            doughnutInstance = new Chart(ctxDoughnut, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Tahta', 'Plastik'],
-                    datasets: [{
-                        data: [woodTotal, plasticTotal],
-                        backgroundColor: ['#f97316', '#3b82f6'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } } }
-            });
-
-            // 2. STACKED BAR CHART (Firms)
-            if (barChartInstance) barChartInstance.destroy();
-            barChartInstance = new Chart(ctxBar, {
-                type: 'bar',
-                data: {
-                    labels: firms,
-                    datasets: [
-                        {
-                            label: 'Tahta',
-                            data: woodData,
-                            backgroundColor: '#f97316', // Orange
-                            borderRadius: 4,
-                        },
-                        {
-                            label: 'Plastik',
-                            data: plasticData,
-                            backgroundColor: '#3b82f6', // Blue
-                            borderRadius: 4,
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            stacked: true,
-                            grid: { display: false },
-                            ticks: { color: '#94a3b8' }
-                        },
-                        y: {
-                            stacked: true,
-                            grid: { color: '#334155' },
-                            ticks: { color: '#94a3b8' }
-                        }
-                    },
-                    plugins: {
-                        legend: { labels: { color: '#94a3b8' } },
-                        tooltip: { mode: 'index', intersect: false }
+            if (doughnutInstance) {
+                doughnutInstance.data = doughnutData;
+                doughnutInstance.update('none'); // Update without full animation
+            } else {
+                const ctxDoughnut = document.getElementById('doughnutChart').getContext('2d');
+                doughnutInstance = new Chart(ctxDoughnut, {
+                    type: 'doughnut',
+                    data: doughnutData,
+                    options: {
+                        cutout: '70%',
+                        plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } },
+                        animation: { duration: 0 }
                     }
-                }
-            });
+                });
+            }
+
+            // 2. STACKED BAR CHART UPDATE
+            const barData = {
+                labels: firms,
+                datasets: [
+                    {
+                        label: 'Tahta',
+                        data: woodData,
+                        backgroundColor: '#f97316',
+                        borderRadius: 4,
+                        barPercentage: 0.5,
+                    },
+                    {
+                        label: 'Plastik',
+                        data: plasticData,
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 4,
+                        barPercentage: 0.5,
+                    }
+                ]
+            };
+
+            if (barChartInstance) {
+                barChartInstance.data = barData;
+                barChartInstance.update();
+            } else {
+                const ctxBar = document.getElementById('barChart').getContext('2d');
+                barChartInstance = new Chart(ctxBar, {
+                    type: 'bar',
+                    data: barData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                stacked: true,
+                                grid: { display: false },
+                                ticks: { color: '#94a3b8' }
+                            },
+                            y: {
+                                stacked: true,
+                                grid: { color: '#334155' },
+                                ticks: { color: '#94a3b8' }
+                            }
+                        },
+                        plugins: {
+                            legend: { labels: { color: '#94a3b8' } },
+                            tooltip: { mode: 'index', intersect: false }
+                        }
+                    }
+                });
+            }
         }
 
         function animateValue(id, end) {

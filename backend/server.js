@@ -112,8 +112,12 @@ app.post('/api/return', (req, res) => {
         return res.status(400).json({ error: 'Missing parameters' });
     }
 
-    // Find available pallets
-    const sql = `SELECT local_id FROM pallets WHERE firm_name = ? AND pallet_type = ? AND status = 'IN_STOCK' LIMIT ?`;
+    // Find available pallets (Case-insensitive match)
+    const sql = `SELECT local_id FROM pallets 
+                 WHERE TRIM(UPPER(firm_name)) = TRIM(UPPER(?)) 
+                 AND pallet_type = ? 
+                 AND status = 'IN_STOCK' 
+                 LIMIT ?`;
 
     db.all(sql, [firm_name, pallet_type, count], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });

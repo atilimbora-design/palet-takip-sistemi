@@ -113,14 +113,13 @@ app.post('/api/return', (req, res) => {
         return res.status(400).json({ error: 'Missing parameters' });
     }
 
-    // Find available pallets (Case-insensitive match)
+    // Find available pallets (Type only, FIFO based on local_id/entry order implied by DB)
     const sql = `SELECT local_id FROM pallets 
-                 WHERE TRIM(UPPER(firm_name)) = TRIM(UPPER(?)) 
-                 AND pallet_type = ? 
+                 WHERE pallet_type = ? 
                  AND status = 'IN_STOCK' 
                  LIMIT ?`;
 
-    db.all(sql, [firm_name, pallet_type, count], (err, rows) => {
+    db.all(sql, [pallet_type, count], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
 
         if (rows.length < count) {

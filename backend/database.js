@@ -22,12 +22,17 @@ db.serialize(() => {
         entry_date TEXT,
         note TEXT,
         status TEXT DEFAULT 'IN_STOCK',
-        is_synced INTEGER DEFAULT 1
+        is_synced INTEGER DEFAULT 1,
+        temperature TEXT,
+        entry_time TEXT
     )`, (err) => {
         if (err) {
             console.error('Error creating table:', err.message);
         } else {
-            console.log('Pallets table ready.');
+            console.log('Pallets table ready (checked).');
+            // Migration for existing tables
+            db.run("ALTER TABLE pallets ADD COLUMN temperature TEXT", (e) => { });
+            db.run("ALTER TABLE pallets ADD COLUMN entry_time TEXT", (e) => { });
         }
     });
 });

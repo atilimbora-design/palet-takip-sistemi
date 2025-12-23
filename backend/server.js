@@ -49,7 +49,7 @@ app.post('/api/sync', (req, res) => {
     let errors = [];
 
     // Use INSERT OR REPLACE to ensure status updates (e.g. reverting a return to in_stock) are applied
-    const stmt = db.prepare(`INSERT OR REPLACE INTO pallets (local_id, firm_name, pallet_type, box_count, vehicle_plate, entry_date, note, status, is_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const stmt = db.prepare(`INSERT OR REPLACE INTO pallets (local_id, firm_name, pallet_type, box_count, vehicle_plate, entry_date, note, status, is_synced, temperature, entry_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
     db.serialize(() => {
         db.run("BEGIN TRANSACTION");
@@ -64,7 +64,9 @@ app.post('/api/sync', (req, res) => {
                 item.entry_date,
                 item.note || '',
                 item.status || 'IN_STOCK',
-                1, // is_synced = 1 because it reached the server
+                1, // is_synced = 1
+                item.temperature || '',
+                item.entry_time || '',
                 (err) => {
                     if (err) {
                         errors.push({ id: item.local_id, error: err.message });
@@ -158,11 +160,11 @@ app.delete('/api/pallets/:id', (req, res) => {
 // 6. Update Pallet
 app.put('/api/pallets/:id', (req, res) => {
     const { id } = req.params;
-    const { firm_name, pallet_type, box_count, vehicle_plate, note } = req.body;
+    const { firm_name, pallet_type, box_count, vehicle_plate, note, temperature, entry_time } = req.body;
 
-    const sql = `UPDATE pallets SET firm_name = ?, pallet_type = ?, box_count = ?, vehicle_plate = ?, note = ? WHERE local_id = ?`;
+    const sql = `UPDATE pallets SET firm_name = ?, pallet_type = ?, box_count = ?, vehicle_plate = ?, note = ?, temperature = ?, entry_time = ? WHERE local_id = ?`;
 
-    db.run(sql, [firm_name, pallet_type, box_count, vehicle_plate, note, id], function (err) {
+    db.run(sql, [firm_name, pallet_type, box_count, vehicle_plate, note, temperature, entry_time, id], function (err) {
         if (err) return res.status(500).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: 'Pallet not found' });
         res.json({ message: 'Updated successfully', id: id });

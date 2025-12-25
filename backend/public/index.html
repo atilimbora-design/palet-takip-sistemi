@@ -567,6 +567,25 @@
         </div>
     </div>
 
+    <!-- DELETE MODAL -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <div style="margin-bottom: 20px;">
+                <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--danger);"></i>
+            </div>
+            <h3 style="margin-bottom: 12px; font-size: 1.5rem;">Emin misiniz?</h3>
+            <p style="color: var(--text-dim); margin-bottom: 24px;">Bu kayıt kalıcı olarak silinecektir.</p>
+
+            <input type="hidden" id="delete-id">
+
+            <div style="display: flex; justify-content: center; gap: 12px;">
+                <button class="btn" style="background: rgba(255,255,255,0.05); color: white;"
+                    onclick="closeDeleteModal()">Vazgeç</button>
+                <button class="btn btn-danger" onclick="executeDelete()">Evet, Sil</button>
+            </div>
+        </div>
+    </div>
+
     <!-- EDIT MODAL -->
     <div id="editModal" class="modal">
         <div class="modal-content">
@@ -747,7 +766,7 @@
                     <td>
                         <div style="display:flex; gap:8px;">
                             <button class="btn btn-icon" style="background:rgba(59,130,246,0.2); color:#60a5fa;" onclick="openEdit('${r.local_id}')"><i class="fas fa-pen"></i></button>
-                            <button class="btn btn-icon" style="background:rgba(239,68,68,0.2); color:#fca5a5;" onclick="triggerDelete('${r.local_id}')"><i class="fas fa-trash"></i></button>
+                            <button class="btn btn-icon" style="background:rgba(239,68,68,0.2); color:#fca5a5;" onclick="openDeleteModal('${r.local_id}')"><i class="fas fa-trash"></i></button>
                         </div>
                     </td>
                 `;
@@ -830,22 +849,37 @@
         }
 
         // --- ACTIONS ---
-        function triggerDelete(id) {
-            if (confirm('Bu kaydı silmek istediğinize emin misiniz? (Bu işlem geri alınamaz)')) {
-                fetch(`/api/pallets/${id}`, { method: 'DELETE' })
-                    .then(res => {
-                        if (res.ok) {
-                            showToast('Kayıt başarıyla silindi', 'success');
-                            // Local remove for instant feel
-                            rawData = rawData.filter(r => r.local_id !== id);
-                            handleSearch(false);
-                            // Also re-fetch to sync
-                            fetchData();
-                        } else {
-                            showToast('Silme işlemi başarısız', 'error');
-                        }
-                    });
-            }
+        function openDeleteModal(id) {
+            document.getElementById('delete-id').value = id;
+            document.getElementById('deleteModal').style.display = 'flex';
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+        }
+
+        function executeDelete() {
+            const id = document.getElementById('delete-id').value;
+            if (!id) return;
+
+            fetch(`/api/pallets/${id}`, { method: 'DELETE' })
+                .then(res => {
+                    if (res.ok) {
+                        showToast('Kayıt başarıyla silindi', 'success');
+                        rawData = rawData.filter(r => r.local_id !== id);
+                        handleSearch(false);
+                        fetchData();
+                    } else {
+                        showToast('Silme başarısız: ' + res.status, 'error');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    showToast('Bağlantı hatası', 'error');
+                })
+                .finally(() => {
+                    closeDeleteModal();
+                });
         }
 
         function openEdit(id) {

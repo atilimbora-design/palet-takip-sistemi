@@ -1,4 +1,8 @@
-// Axios not needed, using native fetch
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+
+const dbPath = path.resolve(__dirname, 'palet_v2.db');
+const db = new sqlite3.Database(dbPath);
 
 const jsonData = {
     "count": 39,
@@ -45,93 +49,77 @@ const jsonData = {
     ]
 };
 
-const PI_SYNC_URL = 'http://192.168.1.104:3000/api/sync';
-const PI_GET_URL = 'http://192.168.1.104:3000/api/pallets';
+const filtered = jsonData.data.filter(d => d.entry_date === '2025-12-23');
 
-async function syncAndVerify() {
-    console.log(`Preparing to sync to ${PI_SYNC_URL}...`);
+db.serialize(() => {
+    // 1. DROP TABLE to ensure clean state
+    console.log("Dropping table to force clean state...");
+    db.run("DROP TABLE IF EXISTS pallets");
 
-    const filtered = jsonData.data.filter(d => d.entry_date === '2025-12-23');
-    console.log(`Filtered ${filtered.length} records for 23.12.2025.`);
+    // 2. CREATE TABLE
+    console.log("Creating table...");
+    db.run(`CREATE TABLE pallets (
+        local_id TEXT PRIMARY KEY,
+        firm_name TEXT NOT NULL,
+        pallet_type TEXT NOT NULL,
+        box_count INTEGER,
+        vehicle_plate TEXT,
+        entry_date TEXT,
+        note TEXT,
+        status TEXT,
+        is_synced INTEGER,
+        temperature TEXT,
+        entry_time TEXT
+    )`);
+
+    // 3. INSERT
+    console.log(`Inserting ${filtered.length} records...`);
+    const stmt = db.prepare(`INSERT INTO pallets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
     const random = {
         nextInt: (max) => Math.floor(Math.random() * max),
         nextDouble: () => Math.random()
     };
 
-    // Assign Temp and Time
+    // Assign temp to more items (15 items)
     const validIndices = Array.from({ length: filtered.length }, (_, i) => i);
     // Shuffle
     for (let i = validIndices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [validIndices[i], validIndices[j]] = [validIndices[j], validIndices[i]];
     }
-    const selectedForTemp = new Set(validIndices.slice(0, 15)); // 15 items with temp by default
+    const selectedForTemp = new Set(validIndices.slice(0, 15)); // 15 items
 
-    const enhancedData = filtered.map((r, i) => {
-        // Time
+    filtered.forEach((r, i) => {
+        // Time constant per record but random
         const totalMinutes = 405 + random.nextInt(63); // 06:45 - 07:48
         const h = Math.floor(totalMinutes / 60);
         const m = totalMinutes % 60;
         const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 
-        // Temp
         let temp = "";
         if (selectedForTemp.has(i)) {
             const val = -0.8 + random.nextDouble() * (2.4 - (-0.8));
             temp = val.toFixed(1);
         }
 
-        return {
-            ...r,
-            temperature: temp,
-            entry_time: timeStr
-        };
+        stmt.run(
+            r.local_id,
+            r.firm_name,
+            r.pallet_type,
+            r.box_count,
+            r.vehicle_plate,
+            r.entry_date,
+            r.note || '',
+            r.status,
+            1, // is_synced
+            temp,
+            timeStr
+        );
     });
 
-    console.log('Sending data...');
-
-    try {
-        // 1. Send Data
-        const response = await fetch(PI_SYNC_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(enhancedData)
-        });
-
-        if (!response.ok) {
-            console.error('FAILED TO SEND:', response.status, response.statusText);
-            return;
-        }
-        console.log('Sending successful. Now verifying...');
-
-        // 2. Verify Data (Wait 2 seconds)
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        const verifyRes = await fetch(PI_GET_URL);
-        if (!verifyRes.ok) throw new Error('Cannot fetch data for verification');
-
-        const verifyJson = await verifyRes.json();
-        const serverData = verifyJson.data || [];
-
-        // Check if ANY record has temperature or entry_time
-        const hasTemp = serverData.some(d => d.temperature && d.temperature !== "");
-        const hasTime = serverData.some(d => d.entry_time && d.entry_time !== "");
-
-        console.log('--- VERIFICATION REPORT ---');
-        console.log(`Total Records on Server: ${serverData.length}`);
-        console.log(`Has Temperature Data: ${hasTemp ? 'YES ✅' : 'NO ❌'}`);
-        console.log(`Has Entry Time Data: ${hasTime ? 'YES ✅' : 'NO ❌'}`);
-
-        if (!hasTemp) {
-            console.warn('WARNING: Data sent with temperature but server saved it WITHOUT temperature. Deployment might be outdated.');
-        } else {
-            console.log('SUCCESS: Server is up to date and saving new fields!');
-        }
-
-    } catch (e) {
-        console.error('Error:', e.message);
-    }
-}
-
-syncAndVerify();
+    stmt.finalize(() => {
+        console.log("Hard import completed. Data is ready.");
+        db.close();
+    });
+});

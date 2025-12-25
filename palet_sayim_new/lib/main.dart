@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -63,8 +64,10 @@ class PalletRecord {
   final String vehiclePlate;
   final String entryDate;
   final String note;
-  final String status; 
-  int isSynced; 
+  final String status;   // 'IN_STOCK', 'RETURNED'
+  int isSynced;      // 0: No, 1: Yes
+  final String? temperature; // New
+  final String? entryTime;   // New
 
   PalletRecord({
     required this.localId,
@@ -77,6 +80,8 @@ class PalletRecord {
     this.note = '',
     this.status = 'IN_STOCK',
     this.isSynced = 0,
+    this.temperature,
+    this.entryTime,
   });
 
   Map<String, dynamic> toMap() {
@@ -91,6 +96,8 @@ class PalletRecord {
       'note': note,
       'status': status,
       'is_synced': isSynced,
+      'temperature': temperature,
+      'entry_time': entryTime,
     };
   }
 
@@ -106,6 +113,8 @@ class PalletRecord {
       note: map['note'] ?? '',
       status: map['status'] ?? 'IN_STOCK',
       isSynced: map['is_synced'] ?? 0,
+      temperature: map['temperature'],
+      entryTime: map['entry_time'],
     );
   }
 
@@ -116,6 +125,8 @@ class PalletRecord {
     String? vehiclePlate,
     String? entryDate,
     String? note,
+    String? temperature,
+    String? entryTime,
   }) {
     return PalletRecord(
       localId: localId,
@@ -128,6 +139,8 @@ class PalletRecord {
       note: note ?? this.note,
       status: status,
       isSynced: 0,
+      temperature: temperature ?? this.temperature,
+      entryTime: entryTime ?? this.entryTime,
     );
   }
 }
@@ -143,19 +156,28 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('palet_v4.db'); 
+    _database = await _initDB('paletsayim_v9.db'); // v9 Final Reset
     return _database!;
   }
 
   Future<Database> _initDB(String filePath) async {
-    final dbPath = await getApplicationDocumentsDirectory();
-    final path = p.join(dbPath.path, filePath);
+    final dbPath = await getDatabasesPath();
+    final path = p.join(dbPath, filePath);
 
     return await openDatabase(
-      path,
-      version: 1,
+      path, 
+      version: 1, 
       onCreate: _createDB,
+      // onUpgrade not needed for fresh DB
     );
+  }
+
+  
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute("ALTER TABLE pallets ADD COLUMN temperature TEXT");
+      await db.execute("ALTER TABLE pallets ADD COLUMN entry_time TEXT");
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -170,14 +192,89 @@ class DatabaseHelper {
         entry_date TEXT,
         note TEXT,
         status TEXT DEFAULT 'IN_STOCK',
-        is_synced INTEGER DEFAULT 0
+        is_synced INTEGER DEFAULT 0,
+        temperature TEXT,
+        entry_time TEXT
       )
     ''');
+    
+    // No seeding. Data will come from Sync.
+  }
+
+  Future<void> _seedLegacyData(Database db) async {
+     // Legacy Data from Server
+     const jsonData = '''
+{"count":39,"data":[{"local_id":"fde53b4a-b6a3-4578-9daf-55b7573fd4be","firm_name":"BEYPILIC","pallet_type":"Tahta","box_count":70,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"cd3efca1-7b65-4e42-a5f5-598c4fba2c89","firm_name":"BEYPILIC","pallet_type":"Tahta","box_count":70,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"129618fa-e52d-4809-ae6f-cf3dd455d899","firm_name":"BEYPILIC","pallet_type":"Tahta","box_count":70,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"e9216dc6-45ca-4d29-8d3f-18b3ca708d30","firm_name":"BEYPILIC","pallet_type":"Tahta","box_count":70,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"f1c1f8e7-e39e-4c36-a2b5-3beb7ae7c081","firm_name":"BEYPILIC","pallet_type":"Tahta","box_count":70,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"dab4831d-9a9c-4279-adf2-faf8a78b62b6","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":16,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"86762720-b219-45aa-b058-bfbd05eed262","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":39,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"57666692-d22c-4905-bec3-b5ace79eeb80","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":23,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"b87bc9c4-a47c-4b62-a426-8af8a71ab16a","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":16,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"669f6257-ddec-4db8-baa8-934530d81324","firm_name":"ISLAK MENDİL","pallet_type":"Plastik","box_count":1,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"7972b01d-0acc-4d58-88db-b44fa956c274","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":56,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"2760df85-b931-4110-8051-72dc718050f8","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":62,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"2603d951-9da4-4c08-8700-f0cbb4e2567e","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":51,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"0aa0d053-5978-4e9b-b4c9-ad730642a738","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":50,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"3b69c42c-458c-4173-bf0a-b588add5d2ea","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":50,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"ff2c7777-179d-4a6f-adf9-edff64b4f9b0","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":26,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"66c5a5ea-bc3b-4400-91b4-6a6bf9336154","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":47,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"ea4b3a8c-f4af-4818-8055-b7e0063ea5a0","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":55,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"2fb99409-a2da-4e3c-b0f5-dcc97ec50ef2","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":60,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"27db8f9a-e45c-403b-86e3-82c68507aa05","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":33,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"c3687b35-97c0-425f-b3ba-b5062027158b","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":54,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"616ea838-d9df-4eaa-91c1-c04b3cd23063","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":58,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"75386bc9-3492-4f50-876b-7a8f2687a329","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":36,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"4f8ffb5d-3245-4de2-8583-9555a2bf40af","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":60,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"f2f1ca94-40cb-4e94-9e9b-ec64eef6d05d","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":44,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"b077b16b-e81a-4bb5-9373-c423a1ec8cc6","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":35,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"72aa2526-aa37-4c14-ae5e-1931da6b49fa","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":32,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"8c2f3568-0f89-4412-b572-f96dcb038b2e","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":32,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"916620c3-8515-4bd2-9bf2-2dcb7b7c0a01","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":32,"vehicle_plate":"14GH361","entry_date":"2025-12-23","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"cec657cd-01c4-4897-a31e-861203faf4ee","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":51,"vehicle_plate":"34ZJ45","entry_date":"2025-12-22","note":"","status":"RETURNED","is_synced":1},{"local_id":"70ba65d2-cc03-4542-87cf-572f1a3efbb0","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":51,"vehicle_plate":"34ZJ45","entry_date":"2025-12-22","note":"","status":"RETURNED","is_synced":1},{"local_id":"15ed57d0-7081-477e-9a5f-2be76d454c0d","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":51,"vehicle_plate":"34ZJ45","entry_date":"2025-12-22","note":"","status":"RETURNED","is_synced":1},{"local_id":"51ee6c28-02a7-45cc-adcf-91265c76f383","firm_name":"BEYPILIC","pallet_type":"Tahta","box_count":76,"vehicle_plate":"34ZJ45","entry_date":"2025-12-22","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"6b7a2cc9-e926-4775-b2cb-2294e72d2452","firm_name":"BEYPILIC","pallet_type":"Tahta","box_count":76,"vehicle_plate":"34ZJ45","entry_date":"2025-12-22","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"69526f67-055f-467d-8043-a8eb1acd8c1d","firm_name":"METRO","pallet_type":"Plastik","box_count":78,"vehicle_plate":"34ZJ45","entry_date":"2025-12-22","note":"","status":"RETURNED","is_synced":1},{"local_id":"7afeaddd-02df-42d0-91e8-af1cdb1bbe51","firm_name":"METRO","pallet_type":"Plastik","box_count":78,"vehicle_plate":"34ZJ45","entry_date":"2025-12-22","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"d2d375d9-ef41-420e-a1ff-cfe0b1d1e992","firm_name":"METRO","pallet_type":"Plastik","box_count":78,"vehicle_plate":"34ZJ45","entry_date":"2025-12-22","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"94c16952-e784-4214-b995-cdcb45e7424e","firm_name":"METRO","pallet_type":"Plastik","box_count":78,"vehicle_plate":"34ZJ45","entry_date":"2025-12-22","note":"","status":"IN_STOCK","is_synced":1},{"local_id":"3059f6a1-685f-483d-8426-4fa5b06bc271","firm_name":"BEYPILIC","pallet_type":"Plastik","box_count":26,"vehicle_plate":"44DD","entry_date":"2025-12-22","note":"","status":"IN_STOCK","is_synced":1}]}
+''';
+
+     try {
+       final List<dynamic> records = jsonDecode(jsonData)['data'];
+       // Sort by entry_date just to generate display_id roughly in order if needed, but display_id is missing in json, we can generate index 1..N
+       // But wait, display_id is not in json. We should probably generate it sequentially.
+       // However, the user said generate fake times and temperature.
+       
+       final random = Random();
+       final tempIndices = <int>{};
+       // Pick 5 random indices (only check status IN_STOCK and pallet type if logical, but lets just pick any 5).
+       // User said "5 palete", implies entered pallets.
+       final validIndices = List.generate(records.length, (i) => i);
+       validIndices.shuffle();
+       final selectedForTemperature = validIndices.take(5).toSet();
+       
+       for (var i = 0; i < records.length; i++) {
+          var r = records[i];
+          
+          // Generate Display ID: 0001, 0002... based on index + 1
+          final displayId = (i + 1).toString().padLeft(4, '0');
+          
+          // Random Time: 06:45 (6*60 + 45 = 405 min) to 07:48 (7*60 + 48 = 468 min)
+          // Range: 468 - 405 = 63 minutes
+          final totalMinutes = 405 + random.nextInt(63);
+          final h = totalMinutes ~/ 60;
+          final m = totalMinutes % 60;
+          final timeStr = '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+          
+          String temp = "";
+          if (selectedForTemperature.contains(i)) {
+             // -0.8 to 2.4
+             double val = -0.8 + random.nextDouble() * (2.4 - (-0.8));
+             temp = val.toStringAsFixed(1);
+          }
+          
+          await db.insert('pallets', {
+            'local_id': r['local_id'],
+            'display_id': displayId, // Generate ID
+            'firm_name': r['firm_name'],
+            'pallet_type': r['pallet_type'],
+            'box_count': r['box_count'],
+            'vehicle_plate': r['vehicle_plate'],
+            'entry_date': r['entry_date'],
+            'note': r['note'] ?? '',
+            'status': r['status'],
+            'is_synced': 1,
+            'temperature': temp,
+            'entry_time': timeStr
+          });
+       }
+     } catch (e) {
+       print("Seed Error: $e");
+     }
   }
 
   Future<int> create(PalletRecord record) async {
     final db = await instance.database;
     return await db.insert('pallets', record.toMap());
+  }
+
+  Future<bool> exists(String localId) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'pallets',
+      columns: ['local_id'],
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+    return result.isNotEmpty;
   }
 
   Future<List<PalletRecord>> getAll() async {
@@ -255,35 +352,42 @@ class DatabaseHelper {
     return await db.update('pallets', record.toMap(), where: 'local_id = ?', whereArgs: [record.localId]);
   }
 
-  Future<int> getTotalStock() async {
+  Future<int> getPlasticStock() async {
     final db = await instance.database;
-    final entries = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM pallets WHERE status = 'IN_STOCK'")) ?? 0;
-    final returns = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM pallets WHERE status = 'RETURNED'")) ?? 0;
-    return entries - returns;
+    // Count only Plastic pallets that are currently IN_STOCK
+    return Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM pallets WHERE status = 'IN_STOCK' AND pallet_type = 'Plastik'")) ?? 0;
   }
 
   Future<String> processReturn(String type, int count, String date, String info) async {
     final db = await instance.database;
-    final id = await generateNextId(DateTime.now()); 
     
-    final batch = db.batch();
-    for (int i = 0; i < count; i++) {
-        final record = PalletRecord(
-          localId: const Uuid().v4(),
-          displayId: '$id-${i+1}', 
-          firmName: 'BEYPILIC', 
-          palletType: type,
-          boxCount: 0, 
-          vehiclePlate: '', 
-          entryDate: date, 
-          status: 'RETURNED',
-          isSynced: 0,
-          note: info,
-        );
-        batch.insert('pallets', record.toMap());
+    // Find candidate records to return (FIFO or just any IN_STOCK of that type)
+    // Important: We need 'count' number of records
+    final List<Map<String, dynamic>> candidates = await db.query(
+      'pallets',
+      columns: ['local_id'],
+      where: "pallet_type = ? AND status = 'IN_STOCK'",
+      whereArgs: [type],
+      limit: count
+    );
+
+    if (candidates.length < count) {
+      // Not enough stock locally
+      return 'Yetersiz Stok (Local): ${candidates.length} adet bulundu.';
     }
+
+    final batch = db.batch();
+    for (var row in candidates) {
+      batch.update(
+        'pallets',
+        {'status': 'RETURNED', 'note': info}, // Update status and add note
+        where: 'local_id = ?',
+        whereArgs: [row['local_id']]
+      );
+    }
+    
     await batch.commit();
-    return 'OK'; // UI expects 'OK'
+    return 'OK';
   }
 
   Future<void> seedDummyData() async {
@@ -407,11 +511,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadStats() async {
     final s = await DatabaseHelper.instance.getStats(_today);
-    final stock = await DatabaseHelper.instance.getTotalStock();
+    final stock = await DatabaseHelper.instance.getPlasticStock();
     setState(() {
       stats = s;
       _totalStock = stock;
     });
+  }
+
+  Future<void> _pullFromServer() async {
+    // Show spinner if you want, or just snackbar
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veriler Sunucudan Çekiliyor... ⏳')));
+    
+    try {
+      final url = Uri.parse('http://192.168.1.104:3000/api/pallets');
+      final response = await http.get(url).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final List<dynamic> serverData = json['data'];
+        
+        int addedCount = 0;
+        
+        for (var item in serverData) {
+          final record = PalletRecord(
+            localId: item['local_id'],
+            displayId: 'SYNC-${item['local_id'].toString().substring(0,4)}', 
+            firmName: item['firm_name'],
+            palletType: item['pallet_type'],
+            boxCount: item['box_count'],
+            vehiclePlate: item['vehicle_plate'],
+            entryDate: item['entry_date'],
+            note: item['note'] ?? '',
+            status: item['status'] ?? 'IN_STOCK',
+            temperature: item['temperature'],
+            entryTime: item['entry_time'],
+            isSynced: 1 
+          );
+
+          final exists = await DatabaseHelper.instance.exists(item['local_id']);
+          if (exists) {
+            // Update existing record (crucial for status updates like IN_STOCK -> RETURNED)
+            await DatabaseHelper.instance.update(record);
+          } else {
+            // Create new
+            await DatabaseHelper.instance.create(record);
+            addedCount++;
+          }
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Eşitleme Tamam: Kayıtlar Güncellendi 🔄 (Debug: Son Kayıt Temp: ${serverData.first['temperature']})'), 
+          backgroundColor: Colors.blue
+        ));
+      }
+    } catch (e) {
+      print('Pull Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hata: Sunucuya Erişilemedi ❌')));
+    }
   }
 
   @override
@@ -441,7 +597,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 child: Column(
                   children: [
-                    const Text('TOPLAM ELDE KALAN PALET', style: TextStyle(color: Colors.white70, fontSize: 13, letterSpacing: 1.2, fontWeight: FontWeight.bold)),
+                    const Text('TOPLAM ELDE KALAN PLASTİK', style: TextStyle(color: Colors.white70, fontSize: 13, letterSpacing: 1.2, fontWeight: FontWeight.bold)),
                     Text('$_totalStock', style: const TextStyle(color: Colors.white, fontSize: 50, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
                      Container(
@@ -461,6 +617,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 16),
               
               // Menu Grid
+              // ROW 1
               Row(
                 children: [
                   Expanded(child: _buildMenuCard('Günlük Sayım', Icons.add_circle, Colors.blue, () {
@@ -475,18 +632,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
               const SizedBox(height: 16),
+              
+              // ROW 2
               Row(
                 children: [
                   Expanded(child: _buildMenuCard('Palet İade', Icons.assignment_return, Colors.orange, () {
-                     Navigator.push(context, MaterialPageRoute(builder: (_) => const ReturnScreen()))
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ReturnScreen()))
                       .then((_) => _loadStats());
                   })),
-                  const SizedBox(width: 16),
-                   Expanded(child: _buildMenuCard('Kayıtlı Raporlar', Icons.folder_special, Colors.teal, () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedReportsScreen()));
+                   const SizedBox(width: 16),
+                  Expanded(child: _buildMenuCard('Veri Eşitle', Icons.sync, Colors.redAccent, () async {
+                     await _pullFromServer();
+                     _loadStats();
                   })),
                 ],
               ),
+              const SizedBox(height: 16),
+
+              // ROW 3
+              Row(
+                children: [
+                   Expanded(child: _buildMenuCard('Kayıtlı Raporlar', Icons.folder_special, Colors.teal, () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedReportsScreen()));
+                  })),
+                ]
+              )
             ],
           ),
         ),
@@ -541,6 +711,7 @@ class _EntryScreenState extends State<EntryScreen> {
   bool _isLoading = false;
   late TextEditingController _boxCountController;
   late TextEditingController _firmController; // Custom firm input
+  late TextEditingController _tempController; // Temperature input
   List<PalletRecord> _recents = [];
 
   final List<Map<String, dynamic>> firms = const [
@@ -554,6 +725,7 @@ class _EntryScreenState extends State<EntryScreen> {
   void initState() {
     super.initState();
     _firmController = TextEditingController();
+    _tempController = TextEditingController(); // Init temp
 
     if (widget.editingRecord != null) {
       try {
@@ -564,6 +736,11 @@ class _EntryScreenState extends State<EntryScreen> {
       _boxCount = widget.editingRecord!.boxCount;
       _selectedType = widget.editingRecord!.palletType;
       
+      // Load temperature if exists
+      if (widget.editingRecord!.temperature != null) {
+        _tempController.text = widget.editingRecord!.temperature!;
+      }
+
       // Check if firm is one of the predefined ones
       final dbFirm = widget.editingRecord!.firmName;
       final isPredefined = firms.any((f) => f['name'] == dbFirm && f['name'] != 'DİĞER');
@@ -593,7 +770,56 @@ class _EntryScreenState extends State<EntryScreen> {
   void dispose() {
     _boxCountController.dispose();
     _firmController.dispose();
+    _tempController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pullFromServer() async {
+    setState(() => _isLoading = true);
+    try {
+      final url = Uri.parse('http://192.168.1.104:3000/api/pallets');
+      final response = await http.get(url).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final List<dynamic> serverData = json['data'];
+        
+        int addedCount = 0;
+        
+        for (var item in serverData) {
+          // Check if exists locally
+          final exists = await DatabaseHelper.instance.exists(item['local_id']);
+          if (!exists) {
+            // Map server item to PalletRecord
+            final record = PalletRecord(
+              localId: item['local_id'],
+              displayId: 'SYNC-${item['local_id'].toString().substring(0,4)}', // Handle display ID
+              firmName: item['firm_name'],
+              palletType: item['pallet_type'],
+              boxCount: item['box_count'],
+              vehiclePlate: item['vehicle_plate'],
+              entryDate: item['entry_date'],
+              note: item['note'] ?? '',
+              status: item['status'] ?? 'IN_STOCK',
+              isSynced: 1 // Coming from server, so it is synced
+            );
+            await DatabaseHelper.instance.create(record);
+            addedCount++;
+          }
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Senkronizasyon Tamamlandı: $addedCount yeni kayıt eklendi ⬇️'), 
+          backgroundColor: Colors.blue
+        ));
+        _loadRecents(); // Refresh list
+      }
+    } catch (e) {
+      print('Pull Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sunucudan veri çekilemedi ❌')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _updateBoxCount(int newValue) {
@@ -614,6 +840,25 @@ class _EntryScreenState extends State<EntryScreen> {
     if (picked != null) setState(() => _selectedDate = picked);
   }
 
+  Future<void> _deleteFromServer(String id) async {
+    try {
+      final url = Uri.parse('http://192.168.1.104:3000/api/pallets/$id');
+      final response = await http.delete(url).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Sunucudan Silindi 🗑️'), 
+          backgroundColor: Colors.orange
+        ));
+      } else {
+        print('Server delete failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Delete Sync Error: $e');
+    }
+  }
+
   Future<void> _delete(String id) async {
     bool? confirm = await showDialog(context: context, builder: (ctx) => AlertDialog(
       title: const Text('Sil?'),
@@ -625,6 +870,9 @@ class _EntryScreenState extends State<EntryScreen> {
     ));
     
     if (confirm == true) {
+      // Fire and forget delete sync
+      _deleteFromServer(id);
+      
       await DatabaseHelper.instance.delete(id);
       _loadRecents();
     }
@@ -662,7 +910,13 @@ class _EntryScreenState extends State<EntryScreen> {
           boxCount: currentBox,
           vehiclePlate: widget.plateController.text.toUpperCase(),
           entryDate: DateFormat('yyyy-MM-dd').format(_selectedDate),
+          temperature: _tempController.text,
+          entryTime: widget.editingRecord!.entryTime ?? DateFormat('HH:mm').format(DateTime.now()),
        );
+       
+       // Update Server Sync
+       _updateServer(updated);
+
        await DatabaseHelper.instance.update(updated);
        
        if (!mounted) return;
@@ -681,8 +935,12 @@ class _EntryScreenState extends State<EntryScreen> {
       boxCount: currentBox,
       vehiclePlate: widget.plateController.text.toUpperCase(),
       entryDate: DateFormat('yyyy-MM-dd').format(_selectedDate),
-      status: 'IN_STOCK',
+      temperature: _tempController.text,
+      entryTime: DateFormat('HH:mm').format(DateTime.now()),
     );
+
+    // Sync with Server (Fire and Forget)
+    _syncWithServer(record);
 
     await DatabaseHelper.instance.create(record);
     
@@ -699,6 +957,61 @@ class _EntryScreenState extends State<EntryScreen> {
       behavior: SnackBarBehavior.floating,
       duration: const Duration(seconds: 1),
     ));
+  }
+
+  Future<void> _updateServer(PalletRecord record) async {
+    try {
+      final url = Uri.parse('http://192.168.1.104:3000/api/pallets/${record.localId}');
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(record.toMap()),
+      ).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Sunucuda Güncellendi 📝'), 
+          backgroundColor: Colors.blue
+        ));
+      } else {
+         print('Update failed: ${response.body}');
+      }
+    } catch (e) {
+      print('Update Sync Error: $e');
+    }
+  }
+
+  Future<void> _syncWithServer(PalletRecord record) async {
+    try {
+      final url = Uri.parse('http://192.168.1.104:3000/api/sync');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(record.toMap()),
+      ).timeout(const Duration(seconds: 20)); // Increased timeout for stability
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Sunucuya Gönderildi ✅'), 
+          backgroundColor: Colors.green
+        ));
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Sunucu Hatası: ${response.statusCode}'), 
+          backgroundColor: Colors.red
+        ));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Bağlantı Hatası: $e'), 
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ));
+    }
   }
 
   @override
@@ -782,6 +1095,54 @@ class _EntryScreenState extends State<EntryScreen> {
                   Expanded(child: _buildTypeOption('Plastik', AppColors.plastic, AppColors.plasticLight)),
                 ],
               ),
+              const SizedBox(height: 20),
+              
+              // TEMPERATURE (NEW)
+              _buildSectionTitle('SICAKLIK'),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.thermostat, color: Colors.orange, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Ürün Derecesi', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                          TextField(
+                            controller: _tempController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            decoration: const InputDecoration(
+                              hintText: 'örn: -18',
+                              border: InputBorder.none,
+                              suffixText: '°C',
+                              suffixStyle: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
               const SizedBox(height: 20),
 
               // BOX COUNT
@@ -939,7 +1300,7 @@ class _EntryScreenState extends State<EntryScreen> {
                             child: Icon(r.palletType == 'Tahta' ? Icons.crop_square : Icons.grid_on, color: Colors.white, size: 16),
                          ),
                          title: Text('${r.displayId} • ${r.firmName}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                         subtitle: Text('${r.boxCount} Koli • ${r.vehiclePlate}'),
+                         subtitle: Text('${r.boxCount} Koli • ${r.vehiclePlate} • ${r.entryTime ?? '--:--'} • ${r.temperature != null && r.temperature!.isNotEmpty ? "${r.temperature} °C" : ""}', style: const TextStyle(fontSize: 12)),
                          trailing: PopupMenuButton(
                            padding: EdgeInsets.zero,
                            icon: const Icon(Icons.more_vert),
@@ -1079,6 +1440,23 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     }
   }
 
+  Future<void> _deleteFromServer(String id) async {
+    try {
+      final url = Uri.parse('http://192.168.1.104:3000/api/pallets/$id');
+      final response = await http.delete(url).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Sunucudan Silindi 🗑️'), 
+          backgroundColor: Colors.orange
+        ));
+      }
+    } catch (e) {
+      print('Delete Sync Error: $e');
+    }
+  }
+
   Future<void> _delete(String id) async {
     showDialog(context: context, builder: (ctx) => AlertDialog(
       title: const Text('Sil?'),
@@ -1087,6 +1465,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Vazgeç')),
         TextButton(onPressed: () async {
           Navigator.pop(ctx);
+          _deleteFromServer(id);
           await DatabaseHelper.instance.delete(id);
           _load();
         }, child: const Text('SİL', style: TextStyle(color: Colors.red))),
@@ -1129,7 +1508,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       await _printEntryReport(entries);
     } else {
       // Print Returns
-      final returns = _allRecords.where((r) => r.status == 'RETURNED' && r.note.startsWith(dbDate)).toList();
+      final returns = _allRecords.where((r) => 
+        r.status == 'RETURNED' && (r.note.startsWith(dbDate) || r.entryDate == dbDate)
+      ).toList();
       if (returns.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Yazdırılacak İade Kaydı Yok')));
         return;
@@ -1140,9 +1521,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   Future<void> _printEntryReport(List<PalletRecord> records) async {
     final pdf = pw.Document();
-    final font = await PdfGoogleFonts.openSansRegular();
-    final fontBold = await PdfGoogleFonts.openSansBold();
+    final font = await PdfGoogleFonts.robotoRegular();
+    final fontBold = await PdfGoogleFonts.robotoBold();
     final dateStr = DateFormat('dd.MM.yyyy').format(_selectedDate);
+
+    // Load Logo
+    final logoData = await rootBundle.load('assets/images/atilim_logo.png');
+    final logo = pw.MemoryImage(logoData.buffer.asUint8List());
 
     // Calculate Stats
     final totalPallets = records.length;
@@ -1153,59 +1538,95 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(24),
-        footer: (context) => pw.Row(
-           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-           children: [
-              pw.Text('ATILIM GIDA PALET TAKİP SİSTEMİ', style: pw.TextStyle(font: font, fontSize: 8, color: PdfColors.grey)),
-              pw.Text('Sayfa ${context.pageNumber} / ${context.pagesCount}', style: pw.TextStyle(font: font, fontSize: 8)),
-           ]
+        margin: const pw.EdgeInsets.all(30),
+        footer: (context) => pw.Container(
+           alignment: pw.Alignment.centerRight,
+           margin: const pw.EdgeInsets.only(top: 10),
+           child: pw.Text('Sayfa ${context.pageNumber} / ${context.pagesCount}', style: pw.TextStyle(font: font, fontSize: 8, color: PdfColors.grey600)),
         ),
         build: (pw.Context context) => [
-          // Header
-          pw.Header(
-             level: 0, 
-             child: pw.Row(
-               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, 
-               children: [
-                  pw.Text('GÜNLÜK SAYIM RAPORU', style: pw.TextStyle(font: fontBold, fontSize: 20)),
-                  pw.Text(dateStr, style: pw.TextStyle(font: font, fontSize: 14)),
-               ]
-             )
+          // 1. Header with Logo
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+               pw.Image(logo, width: 120),
+               pw.Column(
+                 crossAxisAlignment: pw.CrossAxisAlignment.end,
+                 children: [
+                   pw.Text('GÜNLÜK SAYIM RAPORU', style: pw.TextStyle(font: fontBold, fontSize: 18, color: PdfColors.blue800)),
+                   pw.Text('Tarih: $dateStr', style: pw.TextStyle(font: font, fontSize: 12, color: PdfColors.grey700)),
+                 ]
+               )
+            ]
           ),
-          pw.SizedBox(height: 20),
-
-          // High Level Stats Box
-          pw.Container(
-             padding: const pw.EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-             decoration: pw.BoxDecoration(
-               border: pw.Border.all(color: PdfColors.grey400), 
-               borderRadius: pw.BorderRadius.circular(8),
-               color: PdfColors.grey50
-             ),
-             child: pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
-                children: [
-                   _buildStatItem('TOPLAM PALET', '$totalPallets', fontBold, font),
-                   pw.Container(width: 1, height: 30, color: PdfColors.grey400),
-                   _buildStatItem('PLASTİK', '$totalPlastic', fontBold, font),
-                   pw.Container(width: 1, height: 30, color: PdfColors.grey400),
-                   _buildStatItem('TAHTA', '$totalWood', fontBold, font),
-                   pw.Container(width: 1, height: 30, color: PdfColors.grey400),
-                   _buildStatItem('TOPLAM KOLİ', '$totalBoxes', fontBold, font),
-                ]
-             )
-          ),
-          pw.SizedBox(height: 20),
-          
-          pw.Text('DETAYLI LİSTE', style: pw.TextStyle(font: fontBold, fontSize: 14)),
+          pw.Divider(color: PdfColors.grey300, thickness: 1, height: 20),
           pw.SizedBox(height: 10),
 
-          // Detail Table
+          // 2. Statistics Cards & Chart Row
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Stats Column
+              pw.Expanded(
+                flex: 2,
+                child: pw.Column(
+                  children: [
+                     _buildPdfStatCard('TOPLAM PALET', '$totalPallets', PdfColors.blue800, fontBold),
+                     pw.SizedBox(height: 8),
+                     pw.Row(
+                       children: [
+                         pw.Expanded(child: _buildPdfStatCard('PLASTİK', '$totalPlastic', PdfColors.orange700, fontBold)),
+                         pw.SizedBox(width: 8),
+                         pw.Expanded(child: _buildPdfStatCard('TAHTA', '$totalWood', PdfColors.brown700, fontBold)),
+                       ]
+                     ),
+                     pw.SizedBox(height: 8),
+                     _buildPdfStatCard('TOPLAM KOLİ', '$totalBoxes', PdfColors.green700, fontBold),
+                  ]
+                )
+              ),
+              pw.SizedBox(width: 20),
+              // Chart Column (Simple Ratio Bar)
+              pw.Expanded(
+                 flex: 1,
+                 child: pw.Column(
+                   crossAxisAlignment: pw.CrossAxisAlignment.start,
+                   children: [
+                      pw.Text('DAĞILIM', style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColors.grey700)),
+                      pw.SizedBox(height: 5),
+                      // Plastic Bar
+                      pw.Row(children: [
+                        pw.Container(width: 60, child: pw.Text('Plastik', style: pw.TextStyle(font: font, fontSize: 9))),
+                        pw.Expanded(child: pw.Container(height: 10, decoration: pw.BoxDecoration(color: PdfColors.orange700, borderRadius: pw.BorderRadius.circular(2)))),
+                        pw.SizedBox(width: 8),
+                        pw.Text('%${(totalPallets > 0 ? (totalPlastic / totalPallets * 100).toStringAsFixed(0) : "0")}', style: pw.TextStyle(font: fontBold, fontSize: 9)),
+                      ]),
+                      pw.SizedBox(height: 4),
+                      // Wood Bar
+                      pw.Row(children: [
+                        pw.Container(width: 60, child: pw.Text('Tahta', style: pw.TextStyle(font: font, fontSize: 9))),
+                        pw.Expanded(child: pw.Container(height: 10, decoration: pw.BoxDecoration(color: PdfColors.brown700, borderRadius: pw.BorderRadius.circular(2)))), 
+                        // Note: Real bar width logic would need separate containers or Flex, but full width looks okay as "legend" style or we can calculate width.
+                        // Lets make it simpler: Just Legend colors.
+                        pw.SizedBox(width: 8),
+                        pw.Text('%${(totalPallets > 0 ? (totalWood / totalPallets * 100).toStringAsFixed(0) : "0")}', style: pw.TextStyle(font: fontBold, fontSize: 9)),
+                      ]),
+                   ]
+                 )
+              )
+            ]
+          ),
+          
+          pw.SizedBox(height: 20),
+          pw.Text('DETAYLI LİSTE', style: pw.TextStyle(font: fontBold, fontSize: 14, color: PdfColors.blue800)),
+          pw.SizedBox(height: 10),
+
+          // 3. Data Table
           pw.Table.fromTextArray(
-            border: pw.TableBorder.all(color: PdfColors.grey400),
+            border: null, 
             headerStyle: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColors.white),
-            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey800),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.blue800),
             rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
             cellStyle: pw.TextStyle(font: font, fontSize: 9),
@@ -1213,43 +1634,75 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 0: pw.Alignment.centerLeft,
                 1: pw.Alignment.centerLeft,
                 2: pw.Alignment.center,
-                3: pw.Alignment.centerRight,
-                4: pw.Alignment.centerLeft,
+                3: pw.Alignment.center, // Temp
+                4: pw.Alignment.center, // Time
+                5: pw.Alignment.centerRight,
+                6: pw.Alignment.centerLeft,
             },
             columnWidths: {
-                0: const pw.FixedColumnWidth(60), // ID
-                1: const pw.FlexColumnWidth(2),   // Firma
-                2: const pw.FixedColumnWidth(50), // Tip
-                3: const pw.FixedColumnWidth(50), // Koli
-                4: const pw.FlexColumnWidth(1.5), // Plaka
+                0: const pw.FixedColumnWidth(25),  // ID (Daralttım)
+                1: const pw.FlexColumnWidth(1.8),  // Firma
+                2: const pw.FixedColumnWidth(40),  // Tip
+                3: const pw.FixedColumnWidth(45),  // Derece (Genişlettim)
+                4: const pw.FixedColumnWidth(40),  // Saat
+                5: const pw.FixedColumnWidth(30),  // Koli
+                6: const pw.FlexColumnWidth(1.2),  // Plaka
             },
-            headers: ['ID', 'Firma', 'Tip', 'Koli', 'Plaka'],
+            headers: ['ID', 'Firma', 'Tip', 'Isı', 'Saat', 'Koli', 'Plaka'],
             data: records.map((r) => [
-              r.displayId,
+              r.displayId.split('-').last,
               r.firmName,
               r.palletType,
+              (r.temperature != null && r.temperature != "") ? '${r.temperature}' : '-', // Simplified check
+              r.entryTime ?? '-',
               '${r.boxCount}',
               r.vehiclePlate
             ]).toList(),
           ),
           
-          pw.SizedBox(height: 40),
+          pw.SizedBox(height: 30),
           
           // Signatures
           pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: pw.MainAxisAlignment.end,
             children: [
-               _buildSignatureBlock('TESLİM ALAN', fontBold, font),
-               _buildSignatureBlock('ONAYLAYAN', fontBold, font),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                   pw.Text('Teslim Alan / Onay', style: pw.TextStyle(font: fontBold, fontSize: 10)),
+                   pw.SizedBox(height: 40),
+                   pw.Container(width: 100, height: 1, color: PdfColors.black),
+                ]
+              )
             ]
           )
         ]
       )
     );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save(), name: 'Gunluk_Sayim_${dateStr}.pdf');
     final bytes = await pdf.save();
-    await _savePdf(bytes, 'GirisRaporu_$dateStr.pdf');
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => bytes);
+    _savePdf(bytes, 'Rapor_$dateStr.pdf');
   }
+
+  pw.Widget _buildPdfStatCard(String title, String value, PdfColor color, pw.Font fontBold) {
+     return pw.Container(
+       padding: const pw.EdgeInsets.all(10),
+       decoration: pw.BoxDecoration(
+         color: PdfColors.white,
+         border: pw.Border.all(color: color, width: 1.5),
+         borderRadius: pw.BorderRadius.circular(6)
+       ),
+       child: pw.Row(
+         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+         children: [
+            pw.Text(title, style: pw.TextStyle(font: fontBold, fontSize: 9, color: color)),
+            pw.Text(value, style: pw.TextStyle(font: fontBold, fontSize: 14)),
+         ]
+       )
+     );
+  }
+
 
   pw.Widget _buildStatItem(String label, String value, pw.Font fontBold, pw.Font font) {
      return pw.Column(
@@ -1276,70 +1729,124 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   Future<void> _printReturnReport(List<PalletRecord> records) async {
     final pdf = pw.Document();
-    final font = await PdfGoogleFonts.openSansRegular();
-    final fontBold = await PdfGoogleFonts.openSansBold();
+    final font = await PdfGoogleFonts.robotoRegular();
+    final fontBold = await PdfGoogleFonts.robotoBold();
     final dateStr = DateFormat('dd.MM.yyyy').format(_selectedDate);
 
-     // Group by note for Transactions
-     final Map<String, List<PalletRecord>> returnTransactions = {};
-     for (var r in records) {
-       returnTransactions.putIfAbsent(r.note, () => []).add(r);
-     }
+    // Load Logo
+    final logoData = await rootBundle.load('assets/images/atilim_logo.png');
+    final logo = pw.MemoryImage(logoData.buffer.asUint8List());
+
+    // Calculate Return Stats
+    final totalPallets = records.length;
+    final totalPlastic = records.where((r) => r.palletType == 'Plastik').length;
+    final totalWood = records.where((r) => r.palletType == 'Tahta').length;
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(30),
+        footer: (context) => pw.Container(
+           alignment: pw.Alignment.centerRight,
+           margin: const pw.EdgeInsets.only(top: 10),
+           child: pw.Text('Sayfa ${context.pageNumber} / ${context.pagesCount}', style: pw.TextStyle(font: font, fontSize: 8, color: PdfColors.grey600)),
+        ),
         build: (pw.Context context) => [
-          pw.Header(level: 0, child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-            pw.Text('ATILIM GIDA', style: pw.TextStyle(font: fontBold, fontSize: 24)),
-            pw.Text('GÜNLÜK PALET İADE RAPORU', style: pw.TextStyle(font: fontBold, fontSize: 18)),
-          ])),
+          // 1. Header with Logo
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+               pw.Image(logo, width: 120),
+               pw.Column(
+                 crossAxisAlignment: pw.CrossAxisAlignment.end,
+                 children: [
+                   pw.Text('İADE FİŞİ RAPORU', style: pw.TextStyle(font: fontBold, fontSize: 18, color: PdfColors.red800)),
+                   pw.Text('Tarih: $dateStr', style: pw.TextStyle(font: font, fontSize: 12, color: PdfColors.grey700)),
+                 ]
+               )
+            ]
+          ),
+          pw.Divider(color: PdfColors.grey300, thickness: 1, height: 20),
           pw.SizedBox(height: 10),
-          pw.Text('Tarih: $dateStr', style: pw.TextStyle(font: font, fontSize: 14)),
+
+          // 2. Stats Cards
+          pw.Row(
+              children: [
+                  pw.Expanded(child: _buildPdfStatCard('TOPLAM İADE', '$totalPallets', PdfColors.red800, fontBold)),
+                  pw.SizedBox(width: 10),
+                  pw.Expanded(child: _buildPdfStatCard('PLASTİK İADE', '$totalPlastic', PdfColors.orange700, fontBold)),
+                  pw.SizedBox(width: 10),
+                  pw.Expanded(child: _buildPdfStatCard('TAHTA İADE', '$totalWood', PdfColors.brown700, fontBold)),
+              ]
+          ),
           pw.SizedBox(height: 20),
 
-           pw.Table.fromTextArray(
-             border: pw.TableBorder.all(),
-             headerStyle: pw.TextStyle(font: fontBold, color: PdfColors.white),
-             headerDecoration: const pw.BoxDecoration(color: PdfColors.red700),
-             cellStyle: pw.TextStyle(font: font, fontSize: 10),
-             columnWidths: {0: const pw.FlexColumnWidth(1), 1: const pw.FlexColumnWidth(2), 2: const pw.FlexColumnWidth(0.5)},
-             headers: ['Firma / Tip', 'Detay (Şoför/Plaka)', 'Toplam Palet'],
-             data: returnTransactions.values.map((list) {
-               final first = list.first;
-               String info = first.note;
-               if (info.contains('|')) {
-                  final parts = info.split('|');
-                  if (parts.length > 1) {
-                     info = parts.sublist(1).join('\n').trim();
-                  }
-               }
-               info = info.replaceFirst(RegExp(r'^\d{4}-\d{2}-\d{2} İade\s*'), '').trim();
-               
-               return [
-                 '${first.firmName}\n${first.palletType}',
-                 info,
-                 '${list.length}'
-               ];
-             }).toList(),
-           ),
-           pw.SizedBox(height: 20),
-           pw.Divider(),
-           pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text('Toplam İade İşlemi: ${returnTransactions.length}', style: pw.TextStyle(font: fontBold))),
+          // 3. Return Table
+          pw.Table.fromTextArray(
+            border: null,
+            headerStyle: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColors.white),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.red800),
+            rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+            cellStyle: pw.TextStyle(font: font, fontSize: 9),
+            cellAlignments: {
+                0: pw.Alignment.centerLeft,
+                1: pw.Alignment.centerLeft,
+                2: pw.Alignment.center,
+                3: pw.Alignment.centerLeft,
+            },
+            columnWidths: {
+                0: const pw.FixedColumnWidth(40),  // ID
+                1: const pw.FlexColumnWidth(2),    // Firma
+                2: const pw.FixedColumnWidth(50),  // Tip
+                3: const pw.FlexColumnWidth(2),    // Not (İade Bilgisi)
+            },
+            headers: ['ID', 'Firma', 'Tip', 'İade Bilgisi / Not'],
+            data: records.map((r) => [
+              r.displayId.split('-').last,
+              r.firmName,
+              r.palletType,
+              r.note
+            ]).toList(),
+          ),
+          
+          pw.SizedBox(height: 40),
+          
+          // Signatures
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.end,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                   pw.Text('Teslim Eden / Onay', style: pw.TextStyle(font: fontBold, fontSize: 10)),
+                   pw.SizedBox(height: 40),
+                   pw.Container(width: 100, height: 1, color: PdfColors.black),
+                ]
+              )
+            ]
+          )
         ]
       )
     );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save(), name: 'Iade_Raporu_${dateStr}.pdf');
     final bytes = await pdf.save();
-    await _savePdf(bytes, 'IadeRaporu_$dateStr.pdf');
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => bytes);
+    _savePdf(bytes, 'Iade_$dateStr.pdf');
   }
+
 
   @override
   Widget build(BuildContext context) {
     final dbDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
     // Strict Filtering Logic
     final entries = _allRecords.where((r) => r.entryDate == dbDate).toList();
-    final returns = _allRecords.where((r) => r.status == 'RETURNED' && r.note.startsWith(dbDate)).toList();
+    // Relaxed Filter: Show if Note starts with Date OR if Entry Date matches (Assuming same-day return in many cases)
+    // Ideally we need a separate 'returnDate' field, but this is a quick fix.
+    final returns = _allRecords.where((r) => 
+      r.status == 'RETURNED' && (r.note.startsWith(dbDate) || r.entryDate == dbDate)
+    ).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -1717,6 +2224,30 @@ class _ReturnScreenState extends State<ReturnScreen> {
 
   bool _isLoading = false;
 
+  Future<void> _syncReturnFromServer(String firm, String type, int count) async {
+    try {
+      final url = Uri.parse('http://192.168.1.104:3000/api/return');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'firm_name': firm,
+          'pallet_type': type,
+          'count': count
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sunucuya İade Bildirildi 📤'), backgroundColor: Colors.blue));
+      } else {
+        print('Return Sync Error: ${response.body}');
+      }
+    } catch (e) {
+      print('Return Sync Connection Error: $e');
+    }
+  }
+
   Future<void> _processReturn() async {
     final count = int.tryParse(_countController.text) ?? 0;
     if (count < 1) {
@@ -1732,12 +2263,18 @@ class _ReturnScreenState extends State<ReturnScreen> {
 
     final info = 'İade Eden: ${_returnerController.text} | Şoför: ${_driverController.text} | Plaka: ${_plateController.text}';
 
+    // Local Process
     final res = await DatabaseHelper.instance.processReturn(
       _selectedType, 
       count, 
       DateFormat('yyyy-MM-dd').format(_selectedDate),
       info
     );
+
+    // Sync with Server (Fire and Forget)
+    if (res == 'OK') {
+      _syncReturnFromServer(_selectedFirm, _selectedType, count);
+    }
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -1803,8 +2340,8 @@ class _ReturnScreenState extends State<ReturnScreen> {
     // We'll stick to Printing package defaults which handle fonts gracefully usually. 
     // Or use PdfGoogleFonts.
     
-    final font = await PdfGoogleFonts.openSansRegular();
-    final fontBold = await PdfGoogleFonts.openSansBold();
+    final font = await PdfGoogleFonts.robotoRegular();
+    final fontBold = await PdfGoogleFonts.robotoBold();
 
     pdf.addPage(
       pw.Page(

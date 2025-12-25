@@ -1,4 +1,8 @@
-// Axios not needed, using native fetch
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+
+const dbPath = path.resolve(__dirname, 'palet_v2.db');
+const db = new sqlite3.Database(dbPath);
 
 const jsonData = {
     "count": 39,
@@ -45,30 +49,30 @@ const jsonData = {
     ]
 };
 
-const PI_SYNC_URL = 'http://192.168.1.104:3000/api/sync';
-const PI_GET_URL = 'http://192.168.1.104:3000/api/pallets';
+// Filter 23.12.2025
+const filtered = jsonData.data.filter(d => d.entry_date === '2025-12-23');
+console.log(`Filtered ${filtered.length} records for 23.12.2025.`);
 
-async function syncAndVerify() {
-    console.log(`Preparing to sync to ${PI_SYNC_URL}...`);
+db.serialize(() => {
+    // Optional: Clear table first if user wants fresh data only
+    db.run("DELETE FROM pallets WHERE entry_date = '2025-12-23'");
 
-    const filtered = jsonData.data.filter(d => d.entry_date === '2025-12-23');
-    console.log(`Filtered ${filtered.length} records for 23.12.2025.`);
+    const stmt = db.prepare(`INSERT OR REPLACE INTO pallets (local_id, firm_name, pallet_type, box_count, vehicle_plate, entry_date, note, status, is_synced, temperature, entry_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
     const random = {
         nextInt: (max) => Math.floor(Math.random() * max),
         nextDouble: () => Math.random()
     };
 
-    // Assign Temp and Time
     const validIndices = Array.from({ length: filtered.length }, (_, i) => i);
     // Shuffle
     for (let i = validIndices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [validIndices[i], validIndices[j]] = [validIndices[j], validIndices[i]];
     }
-    const selectedForTemp = new Set(validIndices.slice(0, 15)); // 15 items with temp by default
+    const selectedForTemp = new Set(validIndices.slice(0, 5));
 
-    const enhancedData = filtered.map((r, i) => {
+    filtered.forEach((r, i) => {
         // Time
         const totalMinutes = 405 + random.nextInt(63); // 06:45 - 07:48
         const h = Math.floor(totalMinutes / 60);
@@ -82,56 +86,23 @@ async function syncAndVerify() {
             temp = val.toFixed(1);
         }
 
-        return {
-            ...r,
-            temperature: temp,
-            entry_time: timeStr
-        };
+        stmt.run(
+            r.local_id,
+            r.firm_name,
+            r.pallet_type,
+            r.box_count,
+            r.vehicle_plate,
+            r.entry_date,
+            r.note || '',
+            r.status,
+            1, // is_synced
+            temp,
+            timeStr
+        );
     });
 
-    console.log('Sending data...');
-
-    try {
-        // 1. Send Data
-        const response = await fetch(PI_SYNC_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(enhancedData)
-        });
-
-        if (!response.ok) {
-            console.error('FAILED TO SEND:', response.status, response.statusText);
-            return;
-        }
-        console.log('Sending successful. Now verifying...');
-
-        // 2. Verify Data (Wait 2 seconds)
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        const verifyRes = await fetch(PI_GET_URL);
-        if (!verifyRes.ok) throw new Error('Cannot fetch data for verification');
-
-        const verifyJson = await verifyRes.json();
-        const serverData = verifyJson.data || [];
-
-        // Check if ANY record has temperature or entry_time
-        const hasTemp = serverData.some(d => d.temperature && d.temperature !== "");
-        const hasTime = serverData.some(d => d.entry_time && d.entry_time !== "");
-
-        console.log('--- VERIFICATION REPORT ---');
-        console.log(`Total Records on Server: ${serverData.length}`);
-        console.log(`Has Temperature Data: ${hasTemp ? 'YES ✅' : 'NO ❌'}`);
-        console.log(`Has Entry Time Data: ${hasTime ? 'YES ✅' : 'NO ❌'}`);
-
-        if (!hasTemp) {
-            console.warn('WARNING: Data sent with temperature but server saved it WITHOUT temperature. Deployment might be outdated.');
-        } else {
-            console.log('SUCCESS: Server is up to date and saving new fields!');
-        }
-
-    } catch (e) {
-        console.error('Error:', e.message);
-    }
-}
-
-syncAndVerify();
+    stmt.finalize(() => {
+        console.log("Import completed.");
+        db.close();
+    });
+});

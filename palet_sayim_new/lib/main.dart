@@ -536,8 +536,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _pullFromServer() async {
     // Quiet background sync
     try {
-      final url = Uri.parse('http://192.168.1.104:3000/api/pallets');
-      final response = await http.get(url).timeout(const Duration(seconds: 20));
+      final url = Uri.parse('$baseUrl/api/pallets'); // Uses central config
+      final response = await http.get(url, headers: {
+        'User-Agent': 'PaletSayimApp/1.0',
+        'ngrok-skip-browser-warning': 'true',
+        'Accept': 'application/json'
+      }).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
@@ -598,10 +602,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final allLocal = await DatabaseHelper.instance.getAll();
       for (var record in allLocal) {
          try {
-            final url = Uri.parse('http://192.168.1.104:3000/api/sync');
+            final url = Uri.parse('$baseUrl/api/sync');
             await http.post(
                 url,
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                  'Content-Type': 'application/json',
+                  'User-Agent': 'PaletSayimApp/1.0'
+                },
                 body: jsonEncode(record.toMap()),
             ).timeout(const Duration(seconds: 5));
          } catch(e) {

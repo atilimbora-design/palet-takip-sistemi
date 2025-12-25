@@ -533,10 +533,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _pullFromServer() async {
-    // Show spinner if you want, or just snackbar
-    // Removed Snackbar for auto-sync to avoid spamming UI
-    // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veriler Sunucudan Çekiliyor... ⏳')));
-    
+    // Quiet background sync
     try {
       final url = Uri.parse('http://192.168.1.104:3000/api/pallets');
       final response = await http.get(url).timeout(const Duration(seconds: 20));
@@ -544,10 +541,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
         final List<dynamic> serverData = json['data'];
+        final serverIds = serverData.map((e) => e['local_id'].toString()).toSet();
         
+        // 1. Update/Insert from Server
         int addedCount = 0;
-        
         for (var item in serverData) {
+          // ... (Mapping logic same as before)
           final record = PalletRecord(
             localId: item['local_id'],
             displayId: 'SYNC-${item['local_id'].toString().substring(0,4)}', 
@@ -565,25 +564,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           final exists = await DatabaseHelper.instance.exists(item['local_id']);
           if (exists) {
-            // Update existing record (crucial for status updates like IN_STOCK -> RETURNED)
             await DatabaseHelper.instance.update(record);
           } else {
-            // Create new
             await DatabaseHelper.instance.create(record);
             addedCount++;
           }
+        }
+
+        // 2. Handle Deletions (Web -> Mobile)
+        // If a record exists Locally with isSynced=1, but NOT in ServerIds, it means it was deleted on Web.
+        final localRecords = await DatabaseHelper.instance.getAll(); // We need a method to get all IDs
+        for (var local in localRecords) {
+           if (local.isSynced == 1 && !serverIds.contains(local.localId)) {
+               print('Deleting local record ${local.localId} as it is missing from server');
+               await DatabaseHelper.instance.delete(local.localId);
+           }
         }
         
         if (addedCount > 0) {
            print('Synced $addedCount new records');
         }
-        // Silent success for background sync
-
       }
     } catch (e) {
       print('Pull Error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hata: Sunucuya Erişilemedi ❌')));
     }
+  }
+
+  Future<void> _forceResync() async {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tüm Veriler Sunucuya Gönderiliyor... ⏳')));
+      
+      // 1. Push ALL Local Data to Server (Recover Missing WEB Data)
+      final allLocal = await DatabaseHelper.instance.getAll();
+      for (var record in allLocal) {
+         try {
+            final url = Uri.parse('http://192.168.1.104:3000/api/sync');
+            await http.post(
+                url,
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode(record.toMap()),
+            ).timeout(const Duration(seconds: 5));
+         } catch(e) {
+             print('Push error for ${record.localId}: $e');
+         }
+      }
+
+      // 2. Pull & Clean
+      await _pullFromServer();
+      
+      _loadStats();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Tam Senkronizasyon Tamamlandı! ✅'), 
+          backgroundColor: Colors.green
+      ));
   }
 
   @override
@@ -658,8 +690,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   })),
                    const SizedBox(width: 16),
                   Expanded(child: _buildMenuCard('Veri Eşitle', Icons.sync, Colors.redAccent, () async {
-                     await _pullFromServer();
-                     _loadStats();
+                     await _forceResync();
                   })),
                 ],
               ),

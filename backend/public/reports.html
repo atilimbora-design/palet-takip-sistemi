@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atılım Gıda - Günlük Raporlar</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: 1px solid rgba(148, 163, 184, 0.1);
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --accent: #3b82f6;
+            --green: #10b981;
+            --wood: #fb923c;
+            --danger: #ef4444;
+            --glass: blur(12px) saturate(180%);
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            backdrop-filter: var(--glass);
+            border: var(--card-border);
+            border-radius: 20px;
+            padding: 20px 24px;
+            margin-bottom: 30px;
+        }
+
+        .page-title {
+            margin: 0;
+            font-size: 1.5rem;
+            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 10px;
+            padding: 10px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-outline {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .date-picker {
+            background: var(--card-bg);
+            border: var(--card-border);
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px;
+            border-radius: 12px;
+        }
+
+        .tab {
+            padding: 10px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-dim);
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: var(--accent);
+            color: white;
+            shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Stats */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            backdrop-filter: var(--glass);
+            border: var(--card-border);
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 8px 0;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--card-bg);
+            backdrop-filter: var(--glass);
+            border: var(--card-border);
+            border-radius: 20px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 16px;
+            color: var(--text-dim);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .row-wood {
+            border-left: 3px solid var(--wood);
+        }
+
+        .row-plastic {
+            border-left: 3px solid var(--accent);
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <a href="/" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Geri</a>
+                <div>
+                    <h1 class="page-title">Günlük Rapor Merkezi</h1>
+                    <div style="color: var(--text-dim); font-size: 0.9rem;">Detaylı döküm ve baskı</div>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="generatePDF()"><i class="fas fa-print"></i> PDF Rapor
+                İndir</button>
+        </div>
+
+        <div class="controls">
+            <input type="date" id="dateInput" class="date-picker" onchange="updateView()">
+
+            <div class="tabs">
+                <div class="tab active" onclick="setTab('entry')" id="tab-entry"><i class="fas fa-arrow-down"></i> Giriş
+                    İşlemleri</div>
+                <div class="tab" onclick="setTab('return')" id="tab-return"><i class="fas fa-arrow-up"></i> İade
+                    İşlemleri</div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row" id="stats-container">
+            <div class="stat-card">
+                <div class="stat-label">Toplam İşlem</div>
+                <div class="stat-val" id="stat-total">0</div>
+            </div>
+            <div class="stat-card" style="border-bottom: 3px solid var(--accent);">
+                <div class="stat-label">Plastik</div>
+                <div class="stat-val" id="stat-plastic">0</div>
+            </div>
+            <div class="stat-card" style="border-bottom: 3px solid var(--wood);">
+                <div class="stat-label">Tahta</div>
+                <div class="stat-val" id="stat-wood">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Toplam Koli</div>
+                <div class="stat-val" id="stat-boxes">0</div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sıra</th>
+                        <th>Saat</th>
+                        <th>Firma</th>
+                        <th>Tip</th>
+                        <th>Plaka</th>
+                        <th>Koli</th>
+                        <th>Isı / Not</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <!-- Javascript will fill this -->
+                </tbody>
+            </table>
+            <div id="empty-msg" style="text-align:center; padding:40px; color:var(--text-dim); display:none;">
+                <i class="fas fa-folder-open" style="font-size:2rem; margin-bottom:10px;"></i>
+                <p>Seçilen tarih için kayıt bulunamadı.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+        let currentTab = 'entry'; // 'entry' | 'return'
+
+        // Init
+        window.onload = () => {
+            document.getElementById('dateInput').valueAsDate = new Date();
+            fetchData();
+        };
+
+        function setTab(tab) {
+            currentTab = tab;
+            document.getElementById('tab-entry').className = tab === 'entry' ? 'tab active' : 'tab';
+            document.getElementById('tab-return').className = tab === 'return' ? 'tab active' : 'tab';
+            updateView();
+        }
+
+        async function fetchData() {
+            try {
+                const res = await fetch('/api/pallets');
+                const json = await res.json();
+                allData = json.data;
+                updateView();
+            } catch (e) { console.error(e); }
+        }
+
+        function updateView() {
+            const date = document.getElementById('dateInput').value;
+            if (!date) return;
+
+            // Filter Logic mirroring Mobile App
+            // Entry Tab: Records with entry_date = selected AND status != 'RETURNED' (usually? Actually mobile shows Entires regardless of status? No, Mobile "Print Entry" filters by entryDate. Status is not checked, so even returned items appear in Entry Report if they entered today)
+            // Wait, Mobile Code: entries = _allRecords.where((r) => r.entryDate == dbDate).toList();
+            // Returns Code: returns = _allRecords.where((r) => r.status == 'RETURNED' && (r.note.startsWith(dbDate) || r.entryDate == dbDate));
+
+            let list = [];
+            if (currentTab === 'entry') {
+                list = allData.filter(r => r.entry_date === date);
+            } else {
+                // Logic for returns: Status IS returned AND (Note has date OR entry_date is today??)
+                // Ideally we should have a 'return_date' column. The mobile app uses 'note' hack or 'entry_date' if returned same day.
+                // We will stick to Mobile Logic: note starts with YYYY-MM-DD
+                list = allData.filter(r => r.status === 'RETURNED' && (r.note && r.note.startsWith(date)));
+            }
+
+            // Sort by Time
+            list.sort((a, b) => (a.entry_time || '').localeCompare(b.entry_time || ''));
+
+            // Update Stats
+            const total = list.length;
+            const plastic = list.filter(r => r.pallet_type === 'Plastik').length;
+            const wood = list.filter(r => r.pallet_type === 'Tahta').length;
+            const boxes = list.reduce((sum, r) => sum + (r.box_count || 0), 0);
+
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-plastic').innerText = plastic;
+            document.getElementById('stat-wood').innerText = wood;
+            document.getElementById('stat-boxes').innerText = boxes;
+
+            // Update Table
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            if (list.length === 0) {
+                document.getElementById('empty-msg').style.display = 'block';
+            } else {
+                document.getElementById('empty-msg').style.display = 'none';
+                list.forEach((r, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = r.pallet_type === 'Tahta' ? 'row-wood' : 'row-plastic';
+                    tr.innerHTML = `
+                    <td style="color:var(--text-dim); font-family:monospace;">${idx + 1}</td>
+                    <td style="font-weight:600;">${r.entry_time || '--:--'}</td>
+                    <td>${r.firm_name}</td>
+                    <td><span style="color:${r.pallet_type === 'Tahta' ? 'var(--wood)' : 'var(--accent)'}">${r.pallet_type}</span></td>
+                    <td style="font-family:monospace; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:4px;">${r.vehicle_plate}</td>
+                    <td style="font-weight:bold;">${r.box_count}</td>
+                    <td style="font-size:0.9rem; color:var(--text-dim);">
+                        ${r.temperature ? '<span style="color:#fbbf24"><i class="fas fa-temperature-low"></i> ' + r.temperature + '°C</span>' : ''} 
+                        ${r.note ? ' <i class="fas fa-info-circle"></i> ' + r.note : ''}
+                    </td>
+                `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        // PDF GENERATION
+        async function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            const dateStr = document.getElementById('dateInput').value.split('-').reverse().join('.');
+
+            // Logo
+            try {
+                const logoImg = await loadImage('assets/atilim_logo.png');
+                doc.addImage(logoImg, 'PNG', 15, 10, 40, 15); // Adjust dimensions
+            } catch (e) { console.log('Logo not found'); }
+
+            // Header
+            doc.setFontSize(18);
+            doc.setTextColor(20, 30, 80);
+            doc.text(currentTab === 'entry' ? "GÜNLÜK SAYIM RAPORU" : "GÜNLÜK İADE RAPORU", 195, 20, { align: 'right' });
+
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text("Tarih: " + dateStr, 195, 26, { align: 'right' });
+
+            doc.setLineWidth(0.5);
+            doc.setDrawColor(200);
+            doc.line(15, 30, 195, 30);
+
+            // Stats Box
+            const plast = document.getElementById('stat-plastic').innerText;
+            const wood = document.getElementById('stat-wood').innerText;
+            const total = document.getElementById('stat-total').innerText;
+            const boxes = document.getElementById('stat-boxes').innerText;
+
+            let startY = 40;
+
+            doc.setFontSize(10);
+            doc.setTextColor(0);
+            doc.text("ÖZET İSTATİSTİKLER", 15, startY);
+
+            // Custom Stat Cards drawing in PDF (Simplified)
+            doc.setFillColor(240, 240, 250);
+            doc.rect(15, startY + 5, 180, 20, 'F');
+
+            doc.setFontSize(12);
+            doc.text(`Toplam Palet: ${total}`, 25, startY + 18);
+            doc.setTextColor(230, 90, 0); // Orange
+            doc.text(`Plastik: ${plast}`, 70, startY + 18);
+            doc.setTextColor(150, 70, 0); // Brown
+            doc.text(`Tahta: ${wood}`, 110, startY + 18);
+            doc.setTextColor(0, 150, 0); // Green
+            doc.text(`Koli: ${boxes}`, 150, startY + 18);
+
+            // Table
+            const rows = [];
+            document.querySelectorAll('#tableBody tr').forEach(tr => {
+                const cols = tr.querySelectorAll('td');
+                // Clean text
+                const tempHTML = cols[6].innerHTML; // Requires parsing if complex
+                const tempText = cols[6].innerText.replace('\n', ' ');
+
+                rows.push([
+                    cols[0].innerText, // #
+                    cols[1].innerText, // Saat
+                    cols[2].innerText, // Firma
+                    cols[3].innerText, // Tip
+                    cols[4].innerText, // Plaka
+                    cols[5].innerText, // Koli
+                    tempText           // Detay
+                ]);
+            });
+
+            doc.autoTable({
+                startY: startY + 35,
+                head: [['#', 'Saat', 'Firma', 'Tip', 'Plaka', 'Koli', 'Isi / Not']],
+                body: rows,
+                theme: 'striped',
+                headStyles: { fillColor: [41, 128, 185] },
+                styles: { fontSize: 9 },
+                columnStyles: {
+                    0: { cellWidth: 10 },
+                    5: { fontStyle: 'bold' }
+                }
+            });
+
+            // Signature
+            let finalY = doc.lastAutoTable.finalY + 30;
+            if (finalY > 250) { doc.addPage(); finalY = 40; }
+
+            doc.setFontSize(10);
+            doc.setTextColor(0);
+            doc.text("Teslim Alan / Onay", 160, finalY, { align: 'center' });
+            doc.line(140, finalY + 15, 180, finalY + 15);
+
+            doc.save(`Rapor_${currentTab}_${dateStr}.pdf`);
+        }
+
+        function loadImage(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = url;
+            });
+        }
+    </script>
+
+</body>
+
+</html>

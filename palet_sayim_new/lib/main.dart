@@ -821,10 +821,13 @@ class _EntryScreenState extends State<EntryScreen> {
     super.dispose();
   }
 
+  // CONFIG
+  static const String baseUrl = 'http://192.168.1.104:3000'; // TODO: Change to https://paletsayim.atilimgida.com
+
   Future<void> _pullFromServer() async {
     setState(() => _isLoading = true);
     try {
-      final url = Uri.parse('http://192.168.1.104:3000/api/pallets');
+      final url = Uri.parse('$baseUrl/api/pallets');
       final response = await http.get(url).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {

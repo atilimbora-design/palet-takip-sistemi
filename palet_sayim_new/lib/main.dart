@@ -298,7 +298,8 @@ class DatabaseHelper {
 
   Future<List<PalletRecord>> getRecents({int limit = 5}) async {
     final db = await instance.database;
-    final result = await db.query('pallets', orderBy: "display_id DESC", limit: limit);
+    // Sort chronological: Date DESC, Time DESC, then Created ID DESC
+    final result = await db.query('pallets', orderBy: "entry_date DESC, entry_time DESC, local_id DESC", limit: limit);
     return result.map((json) => PalletRecord.fromMap(json)).toList();
   }
 

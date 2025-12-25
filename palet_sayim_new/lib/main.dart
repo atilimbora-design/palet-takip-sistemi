@@ -498,6 +498,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final TextEditingController _plateController = TextEditingController(); 
+  Timer? _syncTimer;
   
   Map<String, dynamic> stats = {'wood': 0, 'plastic': 0, 'boxes': 0};
   int _totalStock = 0;
@@ -507,6 +508,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadStats();
+    // Auto-Sync every 10 seconds (Two-Way Sync)
+    _syncTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      _pullFromServer(); // Quiet background sync
+      _loadStats(); // Update UI stats
+    });
+  }
+
+  @override
+  void dispose() {
+    _syncTimer?.cancel();
+    _plateController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadStats() async {
@@ -520,7 +533,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _pullFromServer() async {
     // Show spinner if you want, or just snackbar
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veriler Sunucudan Çekiliyor... ⏳')));
+    // Removed Snackbar for auto-sync to avoid spamming UI
+    // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veriler Sunucudan Çekiliyor... ⏳')));
     
     try {
       final url = Uri.parse('http://192.168.1.104:3000/api/pallets');
@@ -559,10 +573,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
         }
         
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Eşitleme Tamam: Kayıtlar Güncellendi 🔄 (Debug: Son Kayıt Temp: ${serverData.first['temperature']})'), 
-          backgroundColor: Colors.blue
-        ));
+        if (addedCount > 0) {
+           print('Synced $addedCount new records');
+        }
+        // Silent success for background sync
+
       }
     } catch (e) {
       print('Pull Error: $e');

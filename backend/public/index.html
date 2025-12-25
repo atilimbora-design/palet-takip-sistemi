@@ -596,6 +596,17 @@
                 <input type="number" id="edit-boxes" class="form-control">
             </div>
 
+            <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div>
+                    <label class="form-label">Sıcaklık (°C)</label>
+                    <input type="number" step="0.1" id="edit-temp" class="form-control" placeholder="-18.0">
+                </div>
+                <div>
+                    <label class="form-label">Saat</label>
+                    <input type="time" id="edit-time" class="form-control">
+                </div>
+            </div>
+
             <div class="form-group">
                 <label class="form-label">Plaka</label>
                 <input type="text" id="edit-plate" class="form-control">
@@ -848,6 +859,10 @@
             document.getElementById('edit-plate').value = item.vehicle_plate || '';
             document.getElementById('edit-note').value = item.note || '';
 
+            // New Fields
+            document.getElementById('edit-temp').value = item.temperature || '';
+            document.getElementById('edit-time').value = item.entry_time || '';
+
             const modal = document.getElementById('editModal');
             modal.style.display = 'flex';
         }
@@ -863,7 +878,9 @@
                 pallet_type: document.getElementById('edit-type').value,
                 box_count: parseInt(document.getElementById('edit-boxes').value),
                 vehicle_plate: document.getElementById('edit-plate').value,
-                note: document.getElementById('edit-note').value
+                note: document.getElementById('edit-note').value,
+                temperature: document.getElementById('edit-temp').value,
+                entry_time: document.getElementById('edit-time').value
             };
 
             // Should preserve other fields not in form? The PUT endpoint updates specific fields.

@@ -1500,8 +1500,11 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   Future<void> _deleteFromServer(String id) async {
     try {
-      final url = Uri.parse('http://192.168.1.104:3000/api/pallets/$id');
-      final response = await http.delete(url).timeout(const Duration(seconds: 20));
+      final url = Uri.parse('$baseUrl/api/pallets/$id');
+      final response = await http.delete(url, headers: {
+        'User-Agent': 'PaletSayimApp/1.0',
+        'ngrok-skip-browser-warning': 'true'
+      }).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         if (!mounted) return;

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'config.dart';
 import 'main.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -13,17 +16,38 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   String _errorText = '';
 
-  void _login() {
-    if (_passwordController.text == '1234') {
-      // Success
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
-      );
-    } else {
-      setState(() {
-        _errorText = 'Hatalı Şifre!';
-        _passwordController.clear();
-      });
+  Future<void> _login() async {
+    if (_passwordController.text.isEmpty) return;
+    setState(() => _errorText = 'Kontrol ediliyor...');
+
+    try {
+      final url = Uri.parse('${AppConfig.baseUrl}/api/auth/login');
+      final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'username': _selectedUser, 'password': _passwordController.text})
+      ).timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+        );
+      } else {
+        setState(() {
+            _errorText = 'Hatalı Şifre!';
+            _passwordController.clear();
+        });
+      }
+    } catch (e) {
+       // Fallback for Offline
+       if( _passwordController.text == '1234' ) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const DashboardScreen()),
+          );
+       } else {
+          setState(() => _errorText = 'Bağlantı/Şifre Hatası!');
+       }
     }
   }
 

@@ -34,25 +34,25 @@ db.serialize(() => {
             db.run("ALTER TABLE pallets ADD COLUMN entry_time TEXT", (e) => { });
         }
     });
-});
 
-// Users Table (For Password Management)
-db.run(`CREATE TABLE IF NOT EXISTS users (
+
+    // Users Table (For Password Management)
+    db.run(`CREATE TABLE IF NOT EXISTS users (
         username TEXT PRIMARY KEY,
         password TEXT NOT NULL
     )`, (err) => {
-    if (!err) {
-        // Seed Default Users
-        const stmt = db.prepare("INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)");
-        stmt.run("admin", "1234");
-        stmt.run("BURAK", "1234");
-        stmt.run("BORA", "1234");
-        stmt.finalize();
-    }
-});
+        if (!err) {
+            // Seed Default Users
+            const stmt = db.prepare("INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)");
+            stmt.run("admin", "1234");
+            stmt.run("BURAK", "1234");
+            stmt.run("BORA", "1234");
+            stmt.finalize();
+        }
+    });
 
-// Migrations
-db.run("ALTER TABLE pallets ADD COLUMN temperature TEXT", (err) => { }); 
+    // Migrations
+    db.run("ALTER TABLE pallets ADD COLUMN temperature TEXT", (err) => { });
 });
 
 module.exports = db;

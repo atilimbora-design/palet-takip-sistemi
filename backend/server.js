@@ -174,12 +174,11 @@ app.put('/api/pallets/:id', (req, res) => {
 // 7. Auth Routes
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
-    db.get("SELECT password FROM users WHERE username = ?", [username], (err, row) => {
+    db.get("SELECT password, avatar FROM users WHERE username = ?", [username], (err, row) => {
         if (err) return res.status(500).json({ error: err.message });
         if (!row) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
-        // In real app, hash password. Here plain text for request.
         if (String(row.password) !== String(password)) return res.status(401).json({ error: 'Hatalı Şifre' });
-        res.json({ message: 'Login successful', username });
+        res.json({ message: 'Login successful', username, avatar: row.avatar });
     });
 });
 
@@ -191,6 +190,50 @@ app.put('/api/auth/update', (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
         res.json({ message: 'Şifre güncellendi' });
+    });
+});
+
+// 8. User Management Routes
+app.get('/api/users', (req, res) => {
+    db.all("SELECT username, avatar FROM users", [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+app.post('/api/users', (req, res) => {
+    const { username, password, avatar } = req.body;
+    if (!username || !password) return res.status(400).json({ error: 'Eksik bilgi' });
+
+    db.run("INSERT INTO users (username, password, avatar) VALUES (?, ?, ?)", [username, password, avatar || 'default'], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'User created' });
+    });
+});
+
+app.delete('/api/users/:username', (req, res) => {
+    db.run("DELETE FROM users WHERE username = ?", [req.params.username], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'User deleted' });
+    });
+});
+
+app.put('/api/users/:username', (req, res) => {
+    const { password, avatar } = req.body;
+    let sql = "UPDATE users SET ";
+    let params = [];
+    if (password) { sql += "password = ?, "; params.push(password); }
+    if (avatar) { sql += "avatar = ?, "; params.push(avatar); }
+
+    if (params.length === 0) return res.json({ message: 'Nothing to update' });
+
+    sql = sql.slice(0, -2); // remove comma
+    sql += " WHERE username = ?";
+    params.push(req.params.username);
+
+    db.run(sql, params, function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'User updated' });
     });
 });
 

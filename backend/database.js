@@ -31,28 +31,30 @@ db.serialize(() => {
             console.error('Error creating pallets table:', err.message);
         } else {
             console.log('Pallets table ready (checked).');
-            db.run("ALTER TABLE pallets ADD COLUMN entry_time TEXT", (e) => { });
         }
     });
 
 
     // Users Table (For Password Management)
     db.run(`CREATE TABLE IF NOT EXISTS users (
-        username TEXT PRIMARY KEY,
-        password TEXT NOT NULL
-    )`, (err) => {
+    username TEXT PRIMARY KEY,
+    password TEXT NOT NULL,
+    avatar TEXT DEFAULT 'default'
+)`, (err) => {
         if (!err) {
             // Seed Default Users
-            const stmt = db.prepare("INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)");
-            stmt.run("admin", "1234");
-            stmt.run("BURAK", "1234");
-            stmt.run("BORA", "1234");
+            const stmt = db.prepare("INSERT OR IGNORE INTO users (username, password, avatar) VALUES (?, ?, ?)");
+            stmt.run("admin", "1234", "admin_icon");
+            stmt.run("BURAK", "1234", "face_blue");
+            stmt.run("BORA", "1234", "face_orange");
             stmt.finalize();
         }
     });
 
     // Migrations
     db.run("ALTER TABLE pallets ADD COLUMN temperature TEXT", (err) => { });
+    db.run("ALTER TABLE pallets ADD COLUMN entry_time TEXT", (err) => { });
+    db.run("ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT 'default'", (err) => { });
 });
 
 module.exports = db;

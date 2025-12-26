@@ -15,6 +15,37 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _selectedUser;
   final TextEditingController _passwordController = TextEditingController();
   String _errorText = '';
+  List<dynamic> _users = [];
+  bool _isLoadingUsers = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsers();
+  }
+
+  Future<void> _fetchUsers() async {
+    try {
+      final response = await http.get(Uri.parse('${AppConfig.baseUrl}/api/users'))
+          .timeout(const Duration(seconds: 3));
+      if (response.statusCode == 200) {
+        setState(() {
+          _users = jsonDecode(response.body);
+          // Filter out 'admin' from mobile login usually? Or keep it. keeping.
+          _isLoadingUsers = false;
+        });
+      }
+    } catch (e) {
+      // Fallback if offline
+      setState(() {
+         _users = [
+           {'username': 'BURAK', 'avatar': 'face_blue'},
+           {'username': 'BORA', 'avatar': 'face_orange'}
+         ];
+         _isLoadingUsers = false;
+      });
+    }
+  }
 
   Future<void> _login() async {
     if (_passwordController.text.isEmpty) return;
@@ -51,8 +82,25 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Widget _buildUserAvatar(String name, Color color, IconData icon) {
+  IconData _getIcon(String? avatar) {
+    if (avatar == 'face_orange') return Icons.face_4;
+    if (avatar == 'face_green') return Icons.face_3; // face_5 unavailable in some versions
+    if (avatar == 'admin_icon') return Icons.admin_panel_settings;
+    return Icons.face; // default blue
+  }
+
+  Color _getColor(String? avatar) {
+     if (avatar == 'face_orange') return Colors.orange;
+     if (avatar == 'face_green') return Colors.green;
+     if (avatar == 'admin_icon') return Colors.red;
+     return Colors.blue; 
+  }
+
+  Widget _buildUserAvatar(String name, String? avatar) {
     final isSelected = _selectedUser == name;
+    final color = _getColor(avatar);
+    final icon = _getIcon(avatar);
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -109,14 +157,14 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 40),
               
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildUserAvatar('BURAK', Colors.blue, Icons.face),
-                  const SizedBox(width: 40),
-                  _buildUserAvatar('BORA', Colors.orange, Icons.face_4),
-                ],
-              ),
+              _isLoadingUsers 
+                 ? const CircularProgressIndicator()
+                 : Wrap(
+                    spacing: 40,
+                    runSpacing: 20,
+                    alignment: WrapAlignment.center,
+                    children: _users.map((u) => _buildUserAvatar(u['username'], u['avatar'])).toList(),
+                  ),
 
               const SizedBox(height: 40),
 

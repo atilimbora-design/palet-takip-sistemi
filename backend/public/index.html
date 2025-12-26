@@ -607,34 +607,70 @@
         </div>
     </div>
 
-    <!-- SETTINGS MODAL -->
+    <!-- USER MANAGEMENT MODAL -->
     <div id="settingsModal" class="modal">
-        <div class="modal-content settings-modal" style="max-width: 400px; text-align: center;">
-            <h3 style="margin-bottom: 24px; color: white; font-size: 1.5rem;"><i class="fa-solid fa-key"
-                    style="margin-right:8px; color:var(--accent);"></i> Şifre Değiştir</h3>
-
-            <div style="text-align: left;">
-                <label style="display:block; margin-bottom:8px; font-weight:600; color: var(--text-dim);">Kullanıcı
-                    Seç:</label>
-                <select id="settingsUser"
-                    style="width:100%; padding:12px; margin-bottom:20px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
-                    <option value="BURAK" style="color:black;">BURAK</option>
-                    <option value="BORA" style="color:black;">BORA</option>
-                    <option value="admin" style="color:black;">YÖNETİCİ (Admin)</option>
-                </select>
-
-                <label style="display:block; margin-bottom:8px; font-weight:600; color: var(--text-dim);">Yeni
-                    Şifre:</label>
-                <input type="text" id="settingsPass" placeholder="Yeni şifreyi giriniz"
-                    style="width:100%; padding:12px; margin-bottom:32px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+        <div class="modal-content settings-modal" style="max-width: 600px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 style="color:white; margin:0;"><i class="fa-solid fa-users-gear" style="color:var(--accent);"></i>
+                    Kullanıcı Yönetimi</h3>
+                <button class="btn btn-sm" onclick="showUserForm()" style="background:var(--green); color:white;"><i
+                        class="fa-solid fa-plus"></i> Yeni Ekle</button>
             </div>
 
-            <div style="display: flex; gap: 16px;">
-                <button class="btn"
-                    style="background: transparent; border: 1px solid var(--text-dim); color: var(--text); flex:1;"
-                    onclick="closeSettings()">İptal</button>
-                <button class="btn" style="background: var(--accent); color: white; border:none; flex:1;"
-                    onclick="savePassword()">Kaydet</button>
+            <!-- USER LIST -->
+            <div id="userListContainer">
+                <table style="width:100%; color:var(--text); border-collapse:collapse;">
+                    <thead>
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;">
+                            <th style="padding:10px;">Avatar</th>
+                            <th style="padding:10px;">Kullanıcı Adı</th>
+                            <th style="padding:10px; text-align:right;">İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userListBody">
+                        <!-- JS renders here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- USER FORM (Hidden) -->
+            <div id="userForm"
+                style="display:none; background:rgba(0,0,0,0.2); padding:20px; border-radius:12px; margin-top:10px;">
+                <h4 style="color:var(--accent); margin-top:0;">Kullanıcı Düzenle/Ekle</h4>
+                <input type="hidden" id="editUsernameOriginal">
+
+                <label style="display:block; margin:10px 0 5px; color:var(--text-dim);">Kullanıcı Adı:</label>
+                <input type="text" id="formUsername" class="form-control"
+                    style="width:100%; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); color:white;">
+
+                <label style="display:block; margin:10px 0 5px; color:var(--text-dim);">Şifre:</label>
+                <input type="text" id="formPassword" class="form-control"
+                    style="width:100%; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); color:white;">
+
+                <label style="display:block; margin:10px 0 5px; color:var(--text-dim);">Avatar:</label>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <label class="avatar-option"><input type="radio" name="avatar" value="face_blue" checked> <i
+                            class="fa-solid fa-face-smile" style="color:var(--accent);"></i></label>
+                    <label class="avatar-option"><input type="radio" name="avatar" value="face_orange"> <i
+                            class="fa-solid fa-face-grin-stars" style="color:var(--orange);"></i></label>
+                    <label class="avatar-option"><input type="radio" name="avatar" value="face_green"> <i
+                            class="fa-solid fa-face-laugh" style="color:var(--green);"></i></label>
+                    <label class="avatar-option"><input type="radio" name="avatar" value="admin_icon"> <i
+                            class="fa-solid fa-user-shield" style="color:var(--danger);"></i></label>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn"
+                        style="flex:1; background:transparent; border:1px solid var(--text-dim); color:var(--text);"
+                        onclick="hideUserForm()">İptal</button>
+                    <button class="btn" style="flex:1; background:var(--accent); color:white; border:none;"
+                        onclick="saveUser()">Kaydet</button>
+                </div>
+            </div>
+
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn" style="background:transparent; color:var(--text-dim);"
+                    onclick="closeSettings()">Kapat</button>
             </div>
         </div>
     </div>
@@ -1083,42 +1119,123 @@
     </script>
 
     <script>
-        // --- SETTINGS LOGIC ---
-        function openSettings() {
+        // --- USER MANAGEMENT LOGIC ---
+        let users = [];
+
+        async function openSettings() {
             document.getElementById('settingsModal').style.display = 'flex';
+            hideUserForm();
+            await fetchUsers();
         }
+
         function closeSettings() {
             document.getElementById('settingsModal').style.display = 'none';
         }
-        async function savePassword() {
-            const user = document.getElementById('settingsUser').value;
-            const pass = document.getElementById('settingsPass').value;
 
-            if (!pass || pass.length < 3) {
-                showToast('Şifre en az 3 karakter olmalı!', 'error');
-                return;
+        async function fetchUsers() {
+            try {
+                const res = await fetch('/api/users');
+                users = await res.json();
+                renderUsers();
+            } catch (e) { console.error(e); }
+        }
+
+        function renderUsers() {
+            const tbody = document.getElementById('userListBody');
+            tbody.innerHTML = '';
+
+            users.forEach(u => {
+                let icon = '<i class="fa-solid fa-user"></i>';
+                if (u.avatar === 'face_blue') icon = '<i class="fa-solid fa-face-smile" style="color:var(--accent);"></i>';
+                if (u.avatar === 'face_orange') icon = '<i class="fa-solid fa-face-grin-stars" style="color:var(--orange);"></i>';
+                if (u.avatar === 'face_green') icon = '<i class="fa-solid fa-face-laugh" style="color:var(--green);"></i>';
+                if (u.avatar === 'admin_icon') icon = '<i class="fa-solid fa-user-shield" style="color:var(--danger);"></i>';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:10px; font-size:1.2rem;">${icon}</td>
+                    <td style="padding:10px;">${u.username}</td>
+                    <td style="padding:10px; text-align:right;">
+                        <button class="btn btn-sm" onclick="editUser('${u.username}')" style="background:rgba(255,255,255,0.1); margin-right:5px;"><i class="fa-solid fa-pen"></i></button>
+                        ${u.username === 'admin' ? '' : `<button class="btn btn-sm" onclick="deleteUser('${u.username}')" style="background:rgba(239,68,68,0.2); color:var(--danger);"><i class="fa-solid fa-trash"></i></button>`}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function showUserForm(username = null) {
+            document.getElementById('userListContainer').style.display = 'none';
+            document.getElementById('userForm').style.display = 'block';
+
+            if (username) {
+                const u = users.find(x => x.username === username);
+                document.getElementById('editUsernameOriginal').value = username;
+                document.getElementById('formUsername').value = username;
+                document.getElementById('formUsername').disabled = true; // Cannot change username
+                document.getElementById('formPassword').value = ''; // Don't show old pass
+                // Select Avatar
+                const radios = document.getElementsByName('avatar');
+                for (let r of radios) if (r.value === u.avatar) r.checked = true;
+            } else {
+                document.getElementById('editUsernameOriginal').value = '';
+                document.getElementById('formUsername').value = '';
+                document.getElementById('formUsername').disabled = false;
+                document.getElementById('formPassword').value = '';
+                document.getElementsByName('avatar')[0].checked = true;
+            }
+        }
+
+        function hideUserForm() {
+            document.getElementById('userForm').style.display = 'none';
+            document.getElementById('userListContainer').style.display = 'block';
+        }
+
+        function editUser(username) { showUserForm(username); }
+
+        async function deleteUser(username) {
+            if (!confirm(username + ' kullanıcısını silmek istediğine emin misin?')) return;
+            await fetch('/api/users/' + username, { method: 'DELETE' });
+            fetchUsers();
+        }
+
+        async function saveUser() {
+            const originalUser = document.getElementById('editUsernameOriginal').value;
+            const user = document.getElementById('formUsername').value;
+            const pass = document.getElementById('formPassword').value;
+            const avatar = document.querySelector('input[name="avatar"]:checked').value;
+
+            if (!user) return alert('Kullanıcı adı giriniz');
+            if (!originalUser && !pass) return alert('Şifre giriniz'); // Create needs pass
+
+            const body = { username: user, password: pass, avatar: avatar };
+
+            let url = '/api/users';
+            let method = 'POST';
+
+            if (originalUser) {
+                url = '/api/users/' + originalUser;
+                method = 'PUT';
             }
 
             try {
-                const res = await fetch('/api/auth/update', {
-                    method: 'PUT',
+                const res = await fetch(url, {
+                    method: method,
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, newPassword: pass })
+                    body: JSON.stringify(body)
                 });
-                const data = await res.json();
-
                 if (res.ok) {
-                    showToast('Şifre Başarıyla Güncellendi!');
-                    closeSettings();
-                    document.getElementById('settingsPass').value = '';
+                    hideUserForm();
+                    fetchUsers();
+                    showToast('Kullanıcı Kaydedildi');
                 } else {
-                    showToast(data.error || 'Hata oluştu', 'error');
+                    const d = await res.json();
+                    showToast(d.error || 'Hata', 'error');
                 }
-            } catch (e) {
-                showToast('Bağlantı Hatası: ' + e, 'error');
-            }
+            } catch (e) { alert(e); }
         }
     </script>
 </body>
 
 </html>
+```

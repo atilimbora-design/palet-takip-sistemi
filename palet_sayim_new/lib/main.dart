@@ -289,9 +289,10 @@ class DatabaseHelper {
     // We want records entered ON this date OR returned ON this date
     // Current schema: entry_date is YYYY-MM-DD. 
     // Returned items have status='RETURNED' and note starts with YYYY-MM-DD.
+    // Relaxed match for Timestamp support
     final result = await db.query('pallets', 
-      where: 'entry_date = ? OR (status = ? AND note LIKE ?)', 
-      whereArgs: [date, 'RETURNED', '$date%'], 
+      where: 'entry_date LIKE ? OR (status = ? AND note LIKE ?)', 
+      whereArgs: ['$date%', 'RETURNED', '$date%'], 
       orderBy: "local_id DESC"
     );
     return result.map((json) => PalletRecord.fromMap(json)).toList();
@@ -307,11 +308,11 @@ class DatabaseHelper {
   Future<Map<String, dynamic>> getStats(String date) async {
     final db = await instance.database;
     // Boxes (Sum of box_count for entries on this date)
-    final totalBoxes = Sqflite.firstIntValue(await db.rawQuery("SELECT SUM(box_count) FROM pallets WHERE entry_date = ?", [date])) ?? 0;
+    final totalBoxes = Sqflite.firstIntValue(await db.rawQuery("SELECT SUM(box_count) FROM pallets WHERE entry_date LIKE ?", ['$date%'])) ?? 0;
     
     // Pallets breakdown
-    final plastic = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM pallets WHERE entry_date = ? AND pallet_type = 'Plastik'", [date])) ?? 0;
-    final wood = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM pallets WHERE entry_date = ? AND pallet_type = 'Tahta'", [date])) ?? 0;
+    final plastic = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM pallets WHERE entry_date LIKE ? AND pallet_type = 'Plastik'", ['$date%'])) ?? 0;
+    final wood = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM pallets WHERE entry_date LIKE ? AND pallet_type = 'Tahta'", ['$date%'])) ?? 0;
 
     return {
       'plastic': plastic,
@@ -536,10 +537,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _pullFromServer() async {
     // Quiet background sync
     try {
-      final url = Uri.parse('$baseUrl/api/pallets'); // Uses central config
+      final url = Uri.parse('${AppConfig.baseUrl}/api/pallets'); // Uses central config
       final response = await http.get(url, headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'ngrok-skip-browser-warning': 'true',
         'Accept': 'application/json'
       }).timeout(const Duration(seconds: 20));
 
@@ -602,12 +602,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final allLocal = await DatabaseHelper.instance.getAll();
       for (var record in allLocal) {
          try {
-            final url = Uri.parse('$baseUrl/api/sync');
+            final url = Uri.parse('${AppConfig.baseUrl}/api/sync');
             await http.post(
                 url,
                 headers: {
                   'Content-Type': 'application/json',
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                  'Accept': 'application/json'
                 },
                 body: jsonEncode(record.toMap()),
             ).timeout(const Duration(seconds: 5));
@@ -711,7 +712,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedReportsScreen()));
                   })),
                 ]
-              )
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: Text(
+                  'Sunucu: ${AppConfig.baseUrl}', 
+                  style: const TextStyle(color: Colors.grey, fontSize: 10)
+                )
+              ),
             ],
           ),
         ),
@@ -1500,7 +1508,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   Future<void> _deleteFromServer(String id) async {
     try {
-      final url = Uri.parse('$baseUrl/api/pallets/$id');
+      final url = Uri.parse('${AppConfig.baseUrl}/api/pallets/$id');
       final response = await http.delete(url, headers: {
         'User-Agent': 'PaletSayimApp/1.0',
         'ngrok-skip-browser-warning': 'true'

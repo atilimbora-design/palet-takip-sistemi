@@ -2,6 +2,7 @@
 <html lang="tr">
 
 <head>
+    <script>if (!sessionStorage.getItem('auth')) window.location.href = '/login.html';</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Atılım Gıda - Palet Takip Merkezi</title>
@@ -37,6 +38,26 @@
             max-width: 1400px;
             margin: 0 auto;
             padding: 24px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: var(--text);
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-left: 10px;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
         }
 
         /* HEADER */
@@ -87,6 +108,7 @@
             gap: 8px;
             border: 1px solid rgba(16, 185, 129, 0.3);
         }
+
 
         .live-dot {
             width: 6px;
@@ -364,6 +386,15 @@
             color: white;
         }
 
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: #22c55e;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
         .btn-icon {
             width: 32px;
             height: 32px;
@@ -490,6 +521,14 @@
                         class="fas fa-file-alt"></i> Raporlar</a>
                 <button class="btn btn-danger btn-sm" onclick="exportToCSV()"><i class="fas fa-download"></i> Rapor
                     İndir (CSV)</button>
+                <div
+                    style="border-left:1px solid rgba(255,255,255,0.2); padding-left:10px; margin-left:10px; display:flex;">
+                    <button class="nav-btn"
+                        onclick="alert('Şifre Değiştirme Sistemi (Burak/Bora) Yakında Aktif Olacak.')"
+                        title="Ayarlar"><i class="fa-solid fa-gear"></i></button>
+                    <button class="nav-btn" onclick="logout()" title="Çıkış" style="color:var(--danger)"><i
+                            class="fa-solid fa-right-from-bracket"></i></button>
+                </div>
             </div>
         </header>
 
@@ -1003,6 +1042,12 @@
         window.onclick = function (e) {
             const modal = document.getElementById('editModal');
             if (e.target === modal) closeModal();
+        }
+    </script>
+    <script>
+        function logout() {
+            sessionStorage.removeItem('auth');
+            window.location.href = '/login.html';
         }
     </script>
 </body>

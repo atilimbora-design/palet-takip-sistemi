@@ -21,6 +21,8 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -474,7 +476,7 @@ class PalletApp extends StatelessWidget {
           )
         )
       ),
-      home: const DashboardScreen(),
+      home: const SplashScreen(),
     );
   }
 }
@@ -776,6 +778,8 @@ class _EntryScreenState extends State<EntryScreen> {
   late TextEditingController _firmController; // Custom firm input
   late TextEditingController _tempController; // Temperature input
   List<PalletRecord> _recents = [];
+  Timer? _holdTimer;
+
 
   final List<Map<String, dynamic>> firms = const [
     {'name': 'BEYPILIC', 'logo': 'assets/images/ic_beypilic.png'},
@@ -831,6 +835,7 @@ class _EntryScreenState extends State<EntryScreen> {
 
   @override
   void dispose() {
+    _holdTimer?.cancel();
     _boxCountController.dispose();
     _firmController.dispose();
     _tempController.dispose();
@@ -890,10 +895,39 @@ class _EntryScreenState extends State<EntryScreen> {
 
   void _updateBoxCount(int newValue) {
     if (newValue < 1) return;
+    HapticFeedback.lightImpact(); // Haptic
     setState(() {
       _boxCount = newValue;
       _boxCountController.text = _boxCount.toString();
     });
+  }
+
+  void _updateTemp(double delta) {
+    HapticFeedback.selectionClick(); // Haptic
+    double current = double.tryParse(_tempController.text) ?? 0.0;
+    // Round to 1 decimal to avoid floating point errors
+    double newVal = ((current + delta) * 10).round() / 10;
+    setState(() {
+      _tempController.text = newVal.toString();
+    });
+  }
+
+  Future<void> _playSound(String name) async {
+     try {
+       final player = AudioPlayer();
+       await player.play(AssetSource('sounds/$name'));
+     } catch (e) {
+       // Silent fail
+     }
+  }
+
+  void _startHoldAction(VoidCallback action) {
+    _holdTimer?.cancel();
+    _holdTimer = Timer.periodic(const Duration(milliseconds: 100), (t) => action());
+  }
+
+  void _stopHoldAction() {
+    _holdTimer?.cancel();
   }
 
   Future<void> _pickDate() async {
@@ -1017,6 +1051,9 @@ class _EntryScreenState extends State<EntryScreen> {
     setState(() => _isLoading = false);
     _firmController.clear(); // Clear custom firm input
 
+    // Beep Sound
+    _playSound('beep.wav');
+    
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       backgroundColor: AppColors.success,
       content: Text('$nextId kaydedildi!'),
@@ -1063,6 +1100,7 @@ class _EntryScreenState extends State<EntryScreen> {
           content: Text('Sunucuya Gönderildi ✅'), 
           backgroundColor: Colors.green
         ));
+        _playSound('chicken.wav'); // Cluck
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -1189,19 +1227,34 @@ class _EntryScreenState extends State<EntryScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text('Ürün Derecesi', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
-                          TextField(
-                            controller: _tempController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                            decoration: const InputDecoration(
-                              hintText: 'örn: -18',
-                              border: InputBorder.none,
-                              suffixText: '°C',
-                              suffixStyle: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 4),
-                            ),
-                          ),
+                          Row(
+                            children: [
+                               InkWell(
+                                 onTap: () => _updateTemp(-0.1),
+                                 child: Container(decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8)), padding: const EdgeInsets.all(4), child: const Icon(Icons.remove, size: 20)),
+                               ),
+                               const SizedBox(width: 8),
+                               Expanded(child: TextField(
+                                controller: _tempController,
+                                textAlign: TextAlign.center,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                decoration: const InputDecoration(
+                                  hintText: '0.0',
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(vertical: 4),
+                                ),
+                              )),
+                              const SizedBox(width: 8),
+                              const Text('°C', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                 onTap: () => _updateTemp(0.1),
+                                 child: Container(decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8)), padding: const EdgeInsets.all(4), child: const Icon(Icons.add, size: 20)),
+                               ),
+                            ],
+                          )
                         ],
                       ),
                     ),
@@ -1218,7 +1271,17 @@ class _EntryScreenState extends State<EntryScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _counterButton(Icons.remove, () => _updateBoxCount(_boxCount - 1)),
+
+                      GestureDetector(
+                        onTap: () => _updateBoxCount(_boxCount - 1),
+                        onLongPressStart: (_) => _startHoldAction(() => _updateBoxCount(_boxCount - 1)),
+                        onLongPressEnd: (_) => _stopHoldAction(),
+                        child: Container(
+                          width: 50, height: 50,
+                          decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.remove, color: AppColors.primary, size: 28),
+                        ),
+                      ),
                       const SizedBox(width: 20),
                       Column(
                         children: [
@@ -1248,7 +1311,16 @@ class _EntryScreenState extends State<EntryScreen> {
                         ],
                       ),
                       const SizedBox(width: 20),
-                      _counterButton(Icons.add, () => _updateBoxCount(_boxCount + 1)),
+                      GestureDetector(
+                        onTap: () => _updateBoxCount(_boxCount + 1),
+                        onLongPressStart: (_) => _startHoldAction(() => _updateBoxCount(_boxCount + 1)),
+                        onLongPressEnd: (_) => _stopHoldAction(),
+                        child: Container(
+                          width: 50, height: 50,
+                          decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.add, color: AppColors.primary, size: 28),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),

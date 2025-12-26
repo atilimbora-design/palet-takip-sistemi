@@ -27,6 +27,7 @@ dependencies:
   printing: ^5.11.0
   fl_chart: ^0.65.0
   open_filex: ^4.3.2
+  audioplayers: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -36,10 +37,11 @@ dev_dependencies:
 
 flutter_icons:
   android: "launcher_icon"
-  ios: true
-  image_path: "assets/images/app_icon.png"
+  ios: false
+  image_path: "assets/icon.png"
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/sounds/

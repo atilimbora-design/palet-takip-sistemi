@@ -609,26 +609,32 @@
 
     <!-- SETTINGS MODAL -->
     <div id="settingsModal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
-            <h3 style="margin-bottom: 20px; color:#003366;"><i class="fa-solid fa-key"></i> Şifre Değiştir</h3>
+        <div class="modal-content settings-modal" style="max-width: 400px; text-align: center;">
+            <h3 style="margin-bottom: 24px; color: white; font-size: 1.5rem;"><i class="fa-solid fa-key"
+                    style="margin-right:8px; color:var(--accent);"></i> Şifre Değiştir</h3>
 
-            <label style="display:block; margin-bottom:5px; font-weight:bold;">Kullanıcı Seç:</label>
-            <select id="settingsUser"
-                style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;">
-                <option value="BURAK">BURAK</option>
-                <option value="BORA">BORA</option>
-                <option value="admin">YÖNETİCİ (Admin)</option>
-            </select>
+            <div style="text-align: left;">
+                <label style="display:block; margin-bottom:8px; font-weight:600; color: var(--text-dim);">Kullanıcı
+                    Seç:</label>
+                <select id="settingsUser"
+                    style="width:100%; padding:12px; margin-bottom:20px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+                    <option value="BURAK" style="color:black;">BURAK</option>
+                    <option value="BORA" style="color:black;">BORA</option>
+                    <option value="admin" style="color:black;">YÖNETİCİ (Admin)</option>
+                </select>
 
-            <label style="display:block; margin-bottom:5px; font-weight:bold;">Yeni Şifre:</label>
-            <input type="text" id="settingsPass" placeholder="Yeni şifreyi giriniz"
-                style="width:100%; padding:10px; margin-bottom:20px; border-radius:8px; border:1px solid #ddd;">
+                <label style="display:block; margin-bottom:8px; font-weight:600; color: var(--text-dim);">Yeni
+                    Şifre:</label>
+                <input type="text" id="settingsPass" placeholder="Yeni şifreyi giriniz"
+                    style="width:100%; padding:12px; margin-bottom:32px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+            </div>
 
-            <div style="display: flex; gap: 12px;">
+            <div style="display: flex; gap: 16px;">
                 <button class="btn"
-                    style="background: var(--card-bg); color: var(--text-dim); border: 1px solid rgba(148,163,184,0.2); flex:1;"
+                    style="background: transparent; border: 1px solid var(--text-dim); color: var(--text); flex:1;"
                     onclick="closeSettings()">İptal</button>
-                <button class="btn btn-primary" style="flex:1;" onclick="savePassword()">Kaydet</button>
+                <button class="btn" style="background: var(--accent); color: white; border:none; flex:1;"
+                    onclick="savePassword()">Kaydet</button>
             </div>
         </div>
     </div>

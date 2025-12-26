@@ -648,15 +648,22 @@
                     style="width:100%; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); color:white;">
 
                 <label style="display:block; margin:10px 0 5px; color:var(--text-dim);">Avatar:</label>
-                <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <label class="avatar-option"><input type="radio" name="avatar" value="face_blue" checked> <i
-                            class="fa-solid fa-face-smile" style="color:var(--accent);"></i></label>
-                    <label class="avatar-option"><input type="radio" name="avatar" value="face_orange"> <i
-                            class="fa-solid fa-face-grin-stars" style="color:var(--orange);"></i></label>
-                    <label class="avatar-option"><input type="radio" name="avatar" value="face_green"> <i
-                            class="fa-solid fa-face-laugh" style="color:var(--green);"></i></label>
-                    <label class="avatar-option"><input type="radio" name="avatar" value="admin_icon"> <i
-                            class="fa-solid fa-user-shield" style="color:var(--danger);"></i></label>
+                <div style="display:flex; gap:15px; flex-wrap:wrap;">
+                    <label class="avatar-option" style="cursor:pointer; display:flex; align-items:center;">
+                        <input type="radio" name="avatar" value="face_blue" checked>
+                        <img src="avatars/avatar_1.png"
+                            style="width:50px; height:50px; border-radius:50%; border:2px solid white; margin-left:5px;">
+                    </label>
+                    <label class="avatar-option" style="cursor:pointer; display:flex; align-items:center;">
+                        <input type="radio" name="avatar" value="face_orange">
+                        <img src="avatars/avatar_2.png"
+                            style="width:50px; height:50px; border-radius:50%; border:2px solid white; margin-left:5px;">
+                    </label>
+                    <label class="avatar-option" style="cursor:pointer; display:flex; align-items:center;">
+                        <input type="radio" name="avatar" value="face_green">
+                        <img src="avatars/avatar_3.png"
+                            style="width:50px; height:50px; border-radius:50%; border:2px solid white; margin-left:5px;">
+                    </label>
                 </div>
 
                 <div style="display:flex; gap:10px; margin-top:20px;">
@@ -1145,15 +1152,15 @@
             tbody.innerHTML = '';
 
             users.forEach(u => {
-                let icon = '<i class="fa-solid fa-user"></i>';
-                if (u.avatar === 'face_blue') icon = '<i class="fa-solid fa-face-smile" style="color:var(--accent);"></i>';
-                if (u.avatar === 'face_orange') icon = '<i class="fa-solid fa-face-grin-stars" style="color:var(--orange);"></i>';
-                if (u.avatar === 'face_green') icon = '<i class="fa-solid fa-face-laugh" style="color:var(--green);"></i>';
-                if (u.avatar === 'admin_icon') icon = '<i class="fa-solid fa-user-shield" style="color:var(--danger);"></i>';
+                let img = 'avatars/avatar_1.png'; // default
+                if (u.avatar === 'face_blue') img = 'avatars/avatar_1.png';
+                if (u.avatar === 'face_orange') img = 'avatars/avatar_2.png';
+                if (u.avatar === 'face_green') img = 'avatars/avatar_3.png';
+                if (u.avatar === 'admin_icon') img = 'avatars/avatar_1.png'; // Admin also gets one
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td style="padding:10px; font-size:1.2rem;">${icon}</td>
+                    <td style="padding:10px;"><img src="${img}" style="width:40px; height:40px; border-radius:50%; border:1px solid white;"></td>
                     <td style="padding:10px;">${u.username}</td>
                     <td style="padding:10px; text-align:right;">
                         <button class="btn btn-sm" onclick="editUser('${u.username}')" style="background:rgba(255,255,255,0.1); margin-right:5px;"><i class="fa-solid fa-pen"></i></button>

@@ -15,8 +15,12 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _selectedUser;
   final TextEditingController _passwordController = TextEditingController();
   String _errorText = '';
-  List<dynamic> _users = [];
-  bool _isLoadingUsers = true;
+  
+  List<dynamic> _users = [
+    {'username': 'BURAK', 'avatar': 'face_blue'},
+    {'username': 'BORA', 'avatar': 'face_orange'}
+  ];
+  bool _isLoadingUsers = false; // Disabled blocking loader
 
   @override
   void initState() {
@@ -27,23 +31,25 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _fetchUsers() async {
     try {
       final response = await http.get(Uri.parse('${AppConfig.baseUrl}/api/users'))
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
-        setState(() {
-          _users = jsonDecode(response.body);
-          // Filter out 'admin' from mobile login usually? Or keep it. keeping.
-          _isLoadingUsers = false;
-        });
+        if(mounted) {
+            setState(() {
+              final List<dynamic> allUsers = jsonDecode(response.body);
+              // Filter out admin
+              _users = allUsers.where((u) => u['username'] != 'admin').toList();
+            });
+        }
       }
     } catch (e) {
-      // Fallback if offline
+      // Fallback
       setState(() {
-         _users = [
-           {'username': 'BURAK', 'avatar': 'face_blue'},
-           {'username': 'BORA', 'avatar': 'face_orange'}
-         ];
-         _isLoadingUsers = false;
+        _users = [
+          {'username': 'BURAK', 'avatar': 'face_blue'},
+          {'username': 'BORA', 'avatar': 'face_orange'}
+        ];
       });
+      print('Fetch users failed: $e');
     }
   }
 
@@ -82,24 +88,16 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  IconData _getIcon(String? avatar) {
-    if (avatar == 'face_orange') return Icons.face_4;
-    if (avatar == 'face_green') return Icons.face_3; // face_5 unavailable in some versions
-    if (avatar == 'admin_icon') return Icons.admin_panel_settings;
-    return Icons.face; // default blue
-  }
-
-  Color _getColor(String? avatar) {
-     if (avatar == 'face_orange') return Colors.orange;
-     if (avatar == 'face_green') return Colors.green;
-     if (avatar == 'admin_icon') return Colors.red;
-     return Colors.blue; 
+  ImageProvider _getAvatarImage(String? avatar) {
+    if (avatar == 'face_orange' || avatar == 'avatar_2') return const AssetImage('assets/avatars/avatar_2.png');
+    if (avatar == 'face_green' || avatar == 'avatar_3') return const AssetImage('assets/avatars/avatar_3.png');
+    // Default blue or avatar_1
+    return const AssetImage('assets/avatars/avatar_1.png');
   }
 
   Widget _buildUserAvatar(String name, String? avatar) {
     final isSelected = _selectedUser == name;
-    final color = _getColor(avatar);
-    final icon = _getIcon(avatar);
+    final imageProvider = _getAvatarImage(avatar);
 
     return GestureDetector(
       onTap: () {
@@ -109,33 +107,46 @@ class _LoginScreenState extends State<LoginScreen> {
           _passwordController.clear();
         });
       },
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4), // Border space
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected ? AppColors.primary : Colors.transparent, 
-                width: 3
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue.withOpacity(0.05) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: isSelected ? Border.all(color: AppColors.primary, width: 2) : Border.all(color: Colors.transparent, width: 2),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min, // Hug content
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  )
+                ]
+              ),
+              child: CircleAvatar(
+                radius: 50, // Bigger
+                backgroundColor: Colors.white,
+                backgroundImage: imageProvider,
               ),
             ),
-            child: CircleAvatar(
-              radius: 40,
-              backgroundColor: color.withOpacity(0.2),
-              child: Icon(icon, size: 40, color: color),
+            const SizedBox(height: 12),
+            Text(
+              name,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                fontSize: 18,
+                color: isSelected ? AppColors.primary : Colors.grey[700],
+                letterSpacing: 0.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            name,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: isSelected ? AppColors.primary : Colors.grey,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -152,19 +163,29 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const Spacer(),
               const Text(
-                'KULLANICI SEÇİNİZ',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF003366), letterSpacing: 1),
+                'HOŞGELDİNİZ',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF003366), letterSpacing: 1.5),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 8),
+              Text(
+                'Lütfen kullanıcınızı seçiniz',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+              const Spacer(),
               
               _isLoadingUsers 
                  ? const CircularProgressIndicator()
-                 : Wrap(
-                    spacing: 40,
-                    runSpacing: 20,
-                    alignment: WrapAlignment.center,
-                    children: _users.map((u) => _buildUserAvatar(u['username'], u['avatar'])).toList(),
-                  ),
+                 : Center(
+                     child: Wrap(
+                        spacing: 20,
+                        runSpacing: 20,
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: _users.map((u) => _buildUserAvatar(u['username'], u['avatar'])).toList(),
+                      ),
+                   ),
+
+              const Spacer(),
 
               const SizedBox(height: 40),
 

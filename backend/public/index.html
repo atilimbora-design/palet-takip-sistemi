@@ -608,6 +608,32 @@
         </div>
     </div>
 
+    <!-- SETTINGS MODAL -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 style="margin-bottom: 20px; color:#003366;"><i class="fa-solid fa-key"></i> Şifre Değiştir</h3>
+
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Kullanıcı Seç:</label>
+            <select id="settingsUser"
+                style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;">
+                <option value="BURAK">BURAK</option>
+                <option value="BORA">BORA</option>
+                <option value="admin">YÖNETİCİ (Admin)</option>
+            </select>
+
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Yeni Şifre:</label>
+            <input type="text" id="settingsPass" placeholder="Yeni şifreyi giriniz"
+                style="width:100%; padding:10px; margin-bottom:20px; border-radius:8px; border:1px solid #ddd;">
+
+            <div style="display: flex; gap: 12px;">
+                <button class="btn"
+                    style="background: var(--card-bg); color: var(--text-dim); border: 1px solid rgba(148,163,184,0.2); flex:1;"
+                    onclick="closeSettings()">İptal</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="savePassword()">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
     <!-- DELETE MODAL -->
     <div id="deleteModal" class="modal">
         <div class="modal-content" style="max-width: 400px; text-align: center;">
@@ -1048,6 +1074,44 @@
         function logout() {
             sessionStorage.removeItem('auth');
             window.location.href = '/login.html';
+        }
+    </script>
+
+    <script>
+        // --- SETTINGS LOGIC ---
+        function openSettings() {
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+        async function savePassword() {
+            const user = document.getElementById('settingsUser').value;
+            const pass = document.getElementById('settingsPass').value;
+
+            if (!pass || pass.length < 3) {
+                showToast('Şifre en az 3 karakter olmalı!', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/update', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, newPassword: pass })
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showToast('Şifre Başarıyla Güncellendi!');
+                    closeSettings();
+                    document.getElementById('settingsPass').value = '';
+                } else {
+                    showToast(data.error || 'Hata oluştu', 'error');
+                }
+            } catch (e) {
+                showToast('Bağlantı Hatası: ' + e, 'error');
+            }
         }
     </script>
 </body>

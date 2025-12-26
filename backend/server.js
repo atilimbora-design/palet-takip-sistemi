@@ -171,6 +171,29 @@ app.put('/api/pallets/:id', (req, res) => {
     });
 });
 
+// 7. Auth Routes
+app.post('/api/auth/login', (req, res) => {
+    const { username, password } = req.body;
+    db.get("SELECT password FROM users WHERE username = ?", [username], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!row) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+        // In real app, hash password. Here plain text for request.
+        if (String(row.password) !== String(password)) return res.status(401).json({ error: 'Hatalı Şifre' });
+        res.json({ message: 'Login successful', username });
+    });
+});
+
+app.put('/api/auth/update', (req, res) => {
+    const { username, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 3) return res.status(400).json({ error: 'Şifre çok kısa' });
+
+    db.run("UPDATE users SET password = ? WHERE username = ?", [newPassword, username], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+        res.json({ message: 'Şifre güncellendi' });
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Network: http://192.168.1.104:${PORT}/api`);

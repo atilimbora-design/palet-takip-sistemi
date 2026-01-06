@@ -220,10 +220,19 @@ class DatabaseHelper {
     return result.map((json) => PalletRecord.fromMap(json)).toList();
   }
 
-  Future<List<PalletRecord>> getRecents({int limit = 5}) async {
+  Future<List<PalletRecord>> getRecents() async {
     final db = await instance.database;
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    
     // Sort chronological: Date DESC, Time DESC, then Created ID DESC
-    final result = await db.query('pallets', orderBy: "entry_date DESC, entry_time DESC, local_id DESC", limit: limit);
+    // FILTER: Only show TODAY'S records (clears every 24h effectively)
+    final result = await db.query(
+      'pallets', 
+      where: 'entry_date = ?',
+      whereArgs: [today],
+      orderBy: "entry_time DESC, local_id DESC", 
+      limit: 20 // Show last 20 of today
+    );
     return result.map((json) => PalletRecord.fromMap(json)).toList();
   }
 
@@ -2074,9 +2083,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     final entries = _allRecords.where((r) => r.entryDate == dbDate).toList();
     // Relaxed Filter: Show if Note starts with Date OR if Entry Date matches (Assuming same-day return in many cases)
     // Ideally we need a separate 'returnDate' field, but this is a quick fix.
-    final returns = _allRecords.where((r) => 
-      r.status == 'RETURNED' && (r.note.startsWith(dbDate) || r.entryDate == dbDate)
-    ).toList();
+    final returns = _allRecords.where((r) {
+      if (r.status != 'RETURNED') return false;
+      // Priority: New returnDate field
+      if (r.returnDate == dbDate) return true;
+      // Fallback: Legacy checks
+      return r.note.startsWith(dbDate) || r.entryDate == dbDate;
+    }).toList();
 
     return Scaffold(
       appBar: AppBar(

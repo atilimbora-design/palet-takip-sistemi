@@ -341,27 +341,86 @@
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
 
-            if (list.length === 0) {
-                document.getElementById('empty-msg').style.display = 'block';
-            } else {
-                document.getElementById('empty-msg').style.display = 'none';
-                list.forEach((r, idx) => {
-                    const tr = document.createElement('tr');
-                    tr.className = r.pallet_type === 'Tahta' ? 'row-wood' : 'row-plastic';
-                    tr.innerHTML = `
-                    <td style="color:var(--text-dim); font-family:monospace;">${idx + 1}</td>
-                    <td style="font-weight:600;">${r.entry_time || '--:--'}</td>
-                    <td>${r.firm_name}</td>
-                    <td><span style="color:${r.pallet_type === 'Tahta' ? 'var(--wood)' : 'var(--accent)'}">${r.pallet_type}</span></td>
-                    <td style="font-family:monospace; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:4px;">${r.vehicle_plate}</td>
-                    <td style="font-weight:bold;">${r.box_count}</td>
-                    <td style="font-size:0.9rem; color:var(--text-dim);">
-                        ${r.temperature ? '<span style="color:#fbbf24"><i class="fas fa-temperature-low"></i> ' + r.temperature + '°C</span>' : ''} 
-                        ${r.note ? ' <i class="fas fa-info-circle"></i> ' + r.note : ''}
-                    </td>
-                `;
-                    tbody.appendChild(tr);
+            if (currentTab === 'return') {
+                // GROUPING LOGIC FOR RETURNS (Batch View)
+                // Key: Note (Transaction) + Type
+                const groups = {};
+                list.forEach(r => {
+                    const key = (r.note || 'Genel') + '_' + r.pallet_type;
+                    if (!groups[key]) {
+                        groups[key] = {
+                            note: r.note || '',
+                            type: r.pallet_type,
+                            count: 0,
+                            time: r.entry_time // Take first time
+                        };
+                    }
+                    groups[key].count++;
                 });
+
+                const groupedList = Object.values(groups);
+
+                // Update Table Header for Returns
+                document.querySelector('thead tr').innerHTML = `
+                    <th>Sıra</th>
+                    <th>Saat</th>
+                    <th>Tip</th>
+                    <th>İade Adedi</th>
+                    <th>Açıklama</th>
+                `;
+
+                if (groupedList.length === 0) {
+                    document.getElementById('empty-msg').style.display = 'block';
+                } else {
+                    document.getElementById('empty-msg').style.display = 'none';
+                    groupedList.forEach((g, idx) => {
+                        const tr = document.createElement('tr');
+                        tr.className = g.type === 'Tahta' ? 'row-wood' : 'row-plastic';
+                        tr.innerHTML = `
+                        <td style="color:var(--text-dim); font-family:monospace;">${idx + 1}</td>
+                        <td style="font-weight:600;">${g.time || '--:--'}</td>
+                        <td><span style="color:${g.type === 'Tahta' ? 'var(--wood)' : 'var(--accent)'}">${g.type}</span></td>
+                        <td style="font-weight:bold; font-size:1.1rem;">${g.count} Adet</td>
+                        <td style="color:var(--text-dim);">${g.note}</td>
+                    `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+            } else {
+                // STANDARD LIST VIEW (ENTRIES)
+                document.querySelector('thead tr').innerHTML = `
+                    <th>Sıra</th>
+                    <th>Saat</th>
+                    <th>Firma</th>
+                    <th>Tip</th>
+                    <th>Plaka</th>
+                    <th>Koli</th>
+                    <th>Isı / Not</th>
+                `;
+
+                if (list.length === 0) {
+                    document.getElementById('empty-msg').style.display = 'block';
+                } else {
+                    document.getElementById('empty-msg').style.display = 'none';
+                    list.forEach((r, idx) => {
+                        const tr = document.createElement('tr');
+                        tr.className = r.pallet_type === 'Tahta' ? 'row-wood' : 'row-plastic';
+                        tr.innerHTML = `
+                        <td style="color:var(--text-dim); font-family:monospace;">${idx + 1}</td>
+                        <td style="font-weight:600;">${r.entry_time || '--:--'}</td>
+                        <td>${r.firm_name}</td>
+                        <td><span style="color:${r.pallet_type === 'Tahta' ? 'var(--wood)' : 'var(--accent)'}">${r.pallet_type}</span></td>
+                        <td style="font-family:monospace; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:4px;">${r.vehicle_plate}</td>
+                        <td style="font-weight:bold;">${r.box_count}</td>
+                        <td style="font-size:0.9rem; color:var(--text-dim);">
+                            ${r.temperature ? '<span style="color:#fbbf24"><i class="fas fa-temperature-low"></i> ' + r.temperature + '°C</span>' : ''} 
+                            ${r.note ? ' <i class="fas fa-info-circle"></i> ' + r.note : ''}
+                        </td>
+                    `;
+                        tbody.appendChild(tr);
+                    });
+                }
             }
         }
 

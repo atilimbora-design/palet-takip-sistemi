@@ -57,12 +57,10 @@ app.post('/api/sync', (req, res) => {
         db.run("BEGIN TRANSACTION");
 
         items.forEach((item) => {
-            // Logic: If item is RETURNED but has no return_date, assume it happened today (since we just got synced)
-            // This is a heuristic to satisfy "Show Today's Returns" for mobile actions that lack the date.
+            // Logic Update: Only use provided return_date. Do NOT default to today.
+            // This prevents old/historical returns from mobile (which lack date) from incorrectly appearing as "Today's Returns".
             let rDate = item.return_date || null;
-            if (item.status === 'RETURNED' && !rDate) {
-                rDate = today;
-            }
+            // if (item.status === 'RETURNED' && !rDate) { rDate = today; } // DISABLED HEURISTIC
 
             stmt.run(
                 item.local_id,

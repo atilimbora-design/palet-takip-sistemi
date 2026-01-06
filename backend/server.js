@@ -49,12 +49,21 @@ app.post('/api/sync', (req, res) => {
     let errors = [];
 
     // Use INSERT OR REPLACE to ensure status updates (e.g. reverting a return to in_stock) are applied
-    const stmt = db.prepare(`INSERT OR REPLACE INTO pallets (local_id, firm_name, pallet_type, box_count, vehicle_plate, entry_date, note, status, is_synced, temperature, entry_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const stmt = db.prepare(`INSERT OR REPLACE INTO pallets (local_id, firm_name, pallet_type, box_count, vehicle_plate, entry_date, note, status, is_synced, temperature, entry_time, return_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+    const today = new Date().toISOString().split('T')[0];
 
     db.serialize(() => {
         db.run("BEGIN TRANSACTION");
 
         items.forEach((item) => {
+            // Logic: If item is RETURNED but has no return_date, assume it happened today (since we just got synced)
+            // This is a heuristic to satisfy "Show Today's Returns" for mobile actions that lack the date.
+            let rDate = item.return_date || null;
+            if (item.status === 'RETURNED' && !rDate) {
+                rDate = today;
+            }
+
             stmt.run(
                 item.local_id,
                 item.firm_name,
@@ -67,6 +76,7 @@ app.post('/api/sync', (req, res) => {
                 1, // is_synced = 1
                 item.temperature || '',
                 item.entry_time || '',
+                rDate,
                 (err) => {
                     if (err) {
                         errors.push({ id: item.local_id, error: err.message });
@@ -136,10 +146,11 @@ app.post('/api/return', (req, res) => {
         const idsToUpdate = rows.map(r => r.local_id);
         const placeholders = idsToUpdate.map(() => '?').join(',');
 
-        const updateSql = `UPDATE pallets SET status = 'RETURNED', note = ? WHERE local_id IN (${placeholders})`;
+        const today = new Date().toISOString().split('T')[0];
+        const updateSql = `UPDATE pallets SET status = 'RETURNED', note = ?, return_date = ? WHERE local_id IN (${placeholders})`;
 
-        // params for update: note, followed by all ids
-        const params = [note || '', ...idsToUpdate];
+        // params for update: note, return_date, followed by all ids
+        const params = [note || '', today, ...idsToUpdate];
 
         db.run(updateSql, params, function (err) {
             if (err) return res.status(500).json({ error: err.message });

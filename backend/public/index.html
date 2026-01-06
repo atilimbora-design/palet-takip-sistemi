@@ -818,7 +818,9 @@
             document.getElementById('today-wood').innerText = todayWood;
             document.getElementById('today-boxes').innerText = todayBoxes.toLocaleString();
 
-            document.getElementById('kpi-returns').innerText = returns.length;
+            const todayReturns = allData.filter(d => d.status === 'RETURNED' && d.return_date === todayStr);
+
+            document.getElementById('kpi-returns').innerText = todayReturns.length;
 
             // 2. Render Table
             renderTable();

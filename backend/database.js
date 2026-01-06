@@ -25,7 +25,8 @@ db.serialize(() => {
         status TEXT DEFAULT 'IN_STOCK',
         is_synced INTEGER DEFAULT 0,
         temperature TEXT,
-        entry_time TEXT
+        entry_time TEXT,
+        return_date TEXT
     )`, (err) => {
         if (err) {
             console.error('Error creating pallets table:', err.message);
@@ -55,6 +56,7 @@ db.serialize(() => {
     db.run("ALTER TABLE pallets ADD COLUMN temperature TEXT", (err) => { });
     db.run("ALTER TABLE pallets ADD COLUMN entry_time TEXT", (err) => { });
     db.run("ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT 'default'", (err) => { });
+    db.run("ALTER TABLE pallets ADD COLUMN return_date TEXT", (err) => { }); // NEW MIGRATION
 });
 
 module.exports = db;

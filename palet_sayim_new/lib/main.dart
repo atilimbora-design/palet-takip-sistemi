@@ -92,13 +92,6 @@ class DatabaseHelper {
   }
 
   
-  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await db.execute("ALTER TABLE pallets ADD COLUMN temperature TEXT");
-      await db.execute("ALTER TABLE pallets ADD COLUMN entry_time TEXT");
-    }
-  }
-
   Future _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE pallets (
@@ -113,11 +106,22 @@ class DatabaseHelper {
         status TEXT DEFAULT 'IN_STOCK',
         is_synced INTEGER DEFAULT 0,
         temperature TEXT,
-        entry_time TEXT
+        entry_time TEXT,
+        return_date TEXT
       )
     ''');
     
     // No seeding. Data will come from Sync.
+  }
+  
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute("ALTER TABLE pallets ADD COLUMN temperature TEXT");
+      await db.execute("ALTER TABLE pallets ADD COLUMN entry_time TEXT");
+    }
+    if (oldVersion < 3) {
+       await db.execute("ALTER TABLE pallets ADD COLUMN return_date TEXT");
+    }
   }
 
   Future<void> _seedLegacyData(Database db) async {
@@ -301,7 +305,7 @@ class DatabaseHelper {
     for (var row in candidates) {
       batch.update(
         'pallets',
-        {'status': 'RETURNED', 'note': info}, // Update status and add note
+        {'status': 'RETURNED', 'note': info, 'return_date': date}, // Update status, add note and return_date
         where: 'local_id = ?',
         whereArgs: [row['local_id']]
       );
@@ -482,6 +486,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             status: item['status'] ?? 'IN_STOCK',
             temperature: item['temperature'],
             entryTime: item['entry_time'],
+            returnDate: item['return_date'], // Sync return_date
             isSynced: 1 
           );
 
@@ -759,7 +764,7 @@ class _EntryScreenState extends State<EntryScreen> {
   }
 
   // CONFIG
-  static const String baseUrl = 'http://192.168.1.104:3000'; // TODO: Change to https://paletsayim.atilimgida.com
+  static const String baseUrl = AppConfig.baseUrl; // Uses central config
 
   Future<void> _pullFromServer() async {
     setState(() => _isLoading = true);
@@ -858,7 +863,7 @@ class _EntryScreenState extends State<EntryScreen> {
 
   Future<void> _deleteFromServer(String id) async {
     try {
-      final url = Uri.parse('http://192.168.1.104:3000/api/pallets/$id');
+      final url = Uri.parse('$baseUrl/api/pallets/$id');
       final response = await http.delete(url).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
@@ -980,7 +985,7 @@ class _EntryScreenState extends State<EntryScreen> {
 
   Future<void> _updateServer(PalletRecord record) async {
     try {
-      final url = Uri.parse('http://192.168.1.104:3000/api/pallets/${record.localId}');
+      final url = Uri.parse('$baseUrl/api/pallets/${record.localId}');
       final response = await http.put(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -1003,7 +1008,7 @@ class _EntryScreenState extends State<EntryScreen> {
 
   Future<void> _syncWithServer(PalletRecord record) async {
     try {
-      final url = Uri.parse('http://192.168.1.104:3000/api/sync');
+      final url = Uri.parse('$baseUrl/api/sync');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -2452,7 +2457,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
 
   Future<void> _syncReturnFromServer(String firm, String type, int count) async {
     try {
-      final url = Uri.parse('http://192.168.1.104:3000/api/return');
+      final url = Uri.parse('${AppConfig.baseUrl}/api/return');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},

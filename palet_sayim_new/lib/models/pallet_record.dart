@@ -9,9 +9,10 @@ class PalletRecord {
   final String note;
   final String status;   // 'IN_STOCK', 'RETURNED'
   int isSynced;      // 0: No, 1: Yes
-  final String? temperature; // New
-  final String? entryTime;   // New
-
+  final String? temperature; 
+  final String? entryTime;
+  final String? returnDate; // New
+  
   PalletRecord({
     required this.localId,
     required this.displayId,
@@ -25,6 +26,7 @@ class PalletRecord {
     this.isSynced = 0,
     this.temperature,
     this.entryTime,
+    this.returnDate,
   });
 
   Map<String, dynamic> toMap() {
@@ -41,6 +43,7 @@ class PalletRecord {
       'is_synced': isSynced,
       'temperature': temperature,
       'entry_time': entryTime,
+      'return_date': returnDate,
     };
   }
 
@@ -58,6 +61,7 @@ class PalletRecord {
       isSynced: map['is_synced'] ?? 0,
       temperature: map['temperature'],
       entryTime: map['entry_time'],
+      returnDate: map['return_date'],
     );
   }
 
@@ -70,6 +74,7 @@ class PalletRecord {
     String? note,
     String? temperature,
     String? entryTime,
+    String? returnDate,
   }) {
     return PalletRecord(
       localId: localId,
@@ -84,6 +89,7 @@ class PalletRecord {
       isSynced: 0,
       temperature: temperature ?? this.temperature,
       entryTime: entryTime ?? this.entryTime,
+      returnDate: returnDate ?? this.returnDate,
     );
   }
 }

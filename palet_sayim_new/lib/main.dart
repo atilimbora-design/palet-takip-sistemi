@@ -252,6 +252,11 @@ class DatabaseHelper {
     };
   }
 
+  Future<void> deleteAll() async {
+      final db = await instance.database;
+      await db.delete('pallets');
+  }
+
   Future<String> generateNextId(DateTime date) async {
     final db = await instance.database;
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
@@ -360,10 +365,7 @@ class DatabaseHelper {
 
   }
 
-  Future<void> deleteAll() async {
-    final db = await instance.database;
-    await db.delete('pallets');
-  }
+  
 }
 
 // ---------------------------------------------------------------------------
@@ -643,6 +645,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                    Expanded(child: _buildMenuCard('Kayıtlı Raporlar', Icons.folder_special, Colors.teal, () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedReportsScreen()));
                   })),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildMenuCard('Ayarlar', Icons.settings, Colors.blueGrey, () {
+                      _showAdminLogin();
+                  })),
                 ]
               ),
               const SizedBox(height: 20),
@@ -682,6 +688,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showAdminLogin() async {
+    final TextEditingController passCtrl = TextEditingController();
+    bool? authorized = await showDialog<bool>(
+      context: context, 
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Yönetici Girişi'),
+        content: TextField(
+           controller: passCtrl,
+           obscureText: true,
+           keyboardType: TextInputType.number,
+           decoration: const InputDecoration(labelText: 'Şifre', border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('İptal')),
+          ElevatedButton(onPressed: () {
+             if (passCtrl.text == '1234') { // Simple check or check against server user
+                Navigator.pop(ctx, true);
+             } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hatalı Şifre!')));
+             }
+          }, child: const Text('Giriş')),
+        ],
+      )
+    );
+
+    if (authorized == true) {
+       _openSettingsDialog();
+    }
+  }
+
+  void _openSettingsDialog() {
+     showDialog(
+       context: context,
+       builder: (ctx) => AlertDialog(
+          title: const Text('Ayarlar'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+               ListTile(
+                 leading: const Icon(Icons.delete_forever, color: Colors.red),
+                 title: const Text('Veritabanını Sıfırla'),
+                 subtitle: const Text('Tüm yerel verileri siler (Geri alınamaz)'),
+                 onTap: () async {
+                    Navigator.pop(ctx);
+                    await _confirmReset();
+                 },
+               )
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Kapat'))
+          ],
+       )
+     );
+  }
+
+  Future<void> _confirmReset() async {
+    bool? confirm = await showDialog(context: context, builder: (ctx) => AlertDialog(
+        title: const Text('DİKKAT!'),
+        content: const Text('Tüm veriler silinecek. Emin misiniz?'),
+        actions: [
+           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Vazgeç')),
+           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('EVET, SİL', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))),
+        ]
+    ));
+
+    if (confirm == true) {
+       await DatabaseHelper.instance.deleteAll();
+       _loadStats();
+       // _loadRecents(); // Not needed in Dashboard
+       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veritabanı Sıfırlandı! ✅')));
+    }
   }
 }
 

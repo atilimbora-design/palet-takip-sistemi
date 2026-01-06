@@ -55,6 +55,17 @@ app.get('/api/admin/clear-today', (req, res) => {
     });
 });
 
+// TEMP: Danger Zone - Clear EVERYTHING (User Request)
+app.get('/api/admin/clear-all', (req, res) => {
+    db.run("DELETE FROM pallets", [], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({
+            message: "DATABASE WIPED COMPLETELY",
+            deleted_count: this.changes
+        });
+    });
+});
+
 // 2. Sync / Add Pallets (Receives a list or single item)
 app.post('/api/sync', (req, res) => {
     const data = req.body; // Expecting array or single object

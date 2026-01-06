@@ -213,8 +213,8 @@ class DatabaseHelper {
     // Returned items have status='RETURNED' and note starts with YYYY-MM-DD.
     // Relaxed match for Timestamp support
     final result = await db.query('pallets', 
-      where: 'entry_date LIKE ? OR (status = ? AND note LIKE ?)', 
-      whereArgs: ['$date%', 'RETURNED', '$date%'], 
+      where: 'entry_date LIKE ? OR (status = ? AND (note LIKE ? OR return_date = ?))', 
+      whereArgs: ['$date%', 'RETURNED', '$date%', date], 
       orderBy: "local_id DESC"
     );
     return result.map((json) => PalletRecord.fromMap(json)).toList();

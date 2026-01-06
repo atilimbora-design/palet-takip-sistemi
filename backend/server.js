@@ -36,6 +36,25 @@ app.get('/api/status', (req, res) => {
     });
 });
 
+// TEMP: Danger Zone - Clear Today's Data
+app.get('/api/admin/clear-today', (req, res) => {
+    const today = new Date().toISOString().split('T')[0];
+    db.serialize(() => {
+        // 1. Delete NEW entries from today
+        db.run("DELETE FROM pallets WHERE entry_date = ?", [today]);
+
+        // 2. Reset returns made today (for older stock)
+        db.run("UPDATE pallets SET status = 'IN_STOCK', return_date = NULL, note = NULL WHERE return_date = ?", [today], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({
+                message: `CLEANUP COMPLETE for ${today}`,
+                details: "Deleted today's entries. Reset today's returns to IN_STOCK.",
+                reset_count: this.changes
+            });
+        });
+    });
+});
+
 // 2. Sync / Add Pallets (Receives a list or single item)
 app.post('/api/sync', (req, res) => {
     const data = req.body; // Expecting array or single object

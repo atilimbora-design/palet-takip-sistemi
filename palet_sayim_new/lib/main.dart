@@ -22,7 +22,11 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'splash_screen.dart';
+import 'models/pallet_record.dart';
+import 'services/thermal_service.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -58,95 +62,7 @@ class AppColors {
 // ---------------------------------------------------------------------------
 // 2. MODELS
 // ---------------------------------------------------------------------------
-class PalletRecord {
-  final String localId;
-  final String displayId; 
-  final String firmName;
-  final String palletType;
-  final int boxCount;
-  final String vehiclePlate;
-  final String entryDate;
-  final String note;
-  final String status;   // 'IN_STOCK', 'RETURNED'
-  int isSynced;      // 0: No, 1: Yes
-  final String? temperature; // New
-  final String? entryTime;   // New
-
-  PalletRecord({
-    required this.localId,
-    required this.displayId,
-    required this.firmName,
-    required this.palletType,
-    required this.boxCount,
-    required this.vehiclePlate,
-    required this.entryDate,
-    this.note = '',
-    this.status = 'IN_STOCK',
-    this.isSynced = 0,
-    this.temperature,
-    this.entryTime,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'local_id': localId,
-      'display_id': displayId,
-      'firm_name': firmName,
-      'pallet_type': palletType,
-      'box_count': boxCount,
-      'vehicle_plate': vehiclePlate,
-      'entry_date': entryDate,
-      'note': note,
-      'status': status,
-      'is_synced': isSynced,
-      'temperature': temperature,
-      'entry_time': entryTime,
-    };
-  }
-
-  factory PalletRecord.fromMap(Map<String, dynamic> map) {
-    return PalletRecord(
-      localId: map['local_id'],
-      displayId: map['display_id'] ?? 'N/A',
-      firmName: map['firm_name'],
-      palletType: map['pallet_type'],
-      boxCount: map['box_count'],
-      vehiclePlate: map['vehicle_plate'],
-      entryDate: map['entry_date'],
-      note: map['note'] ?? '',
-      status: map['status'] ?? 'IN_STOCK',
-      isSynced: map['is_synced'] ?? 0,
-      temperature: map['temperature'],
-      entryTime: map['entry_time'],
-    );
-  }
-
-  PalletRecord copyWith({
-    String? firmName,
-    String? palletType,
-    int? boxCount,
-    String? vehiclePlate,
-    String? entryDate,
-    String? note,
-    String? temperature,
-    String? entryTime,
-  }) {
-    return PalletRecord(
-      localId: localId,
-      displayId: displayId,
-      firmName: firmName ?? this.firmName,
-      palletType: palletType ?? this.palletType,
-      boxCount: boxCount ?? this.boxCount,
-      vehiclePlate: vehiclePlate ?? this.vehiclePlate,
-      entryDate: entryDate ?? this.entryDate,
-      note: note ?? this.note,
-      status: status,
-      isSynced: 0,
-      temperature: temperature ?? this.temperature,
-      entryTime: entryTime ?? this.entryTime,
-    );
-  }
-}
+  // PalletRecord moved to models/pallet_record.dart
 
 // ---------------------------------------------------------------------------
 // 3. DATABASE HELPER
@@ -1543,6 +1459,7 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin {
+  final ThermalService _thermalService = ThermalService();
   List<PalletRecord> _allRecords = [];
   bool _showSummary = false;
   DateTime _selectedDate = DateTime.now();
@@ -1639,25 +1556,192 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   Future<void> _onPrintPressed() async {
     final dbDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
     
-    if (_tabController.index == 0) {
-      // Print Entries
-      final entries = _allRecords.where((r) => r.entryDate == dbDate).toList();
+    // entries/returns logic duplicated to avoid scope issues or just re-calculate
+    List<PalletRecord> entries = [];
+    List<PalletRecord> returns = [];
+    final bool isEntry = _tabController.index == 0;
+
+    if (isEntry) {
+      entries = _allRecords.where((r) => r.entryDate == dbDate).toList();
       if (entries.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Yazdırılacak Giriş Kaydı Yok')));
         return;
       }
-      await _printEntryReport(entries);
     } else {
-      // Print Returns
-      final returns = _allRecords.where((r) => 
+      returns = _allRecords.where((r) => 
         r.status == 'RETURNED' && (r.note.startsWith(dbDate) || r.entryDate == dbDate)
       ).toList();
       if (returns.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Yazdırılacak İade Kaydı Yok')));
         return;
       }
-      await _printReturnReport(returns);
     }
+
+    // Dialog
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+         title: const Text('Yazdırma Seçeneği'),
+         content: Column(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             ListTile(
+               leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+               title: const Text('Normal (PDF)'),
+               onTap: () => Navigator.pop(ctx, 'pdf'),
+             ),
+             ListTile(
+               leading: const Icon(Icons.print, color: Colors.blue),
+               title: const Text('Termal Yazıcı'),
+               subtitle: const Text('Unitech SP319'),
+               onTap: () => Navigator.pop(ctx, 'thermal'),
+             )
+           ]
+         )
+      )
+    );
+
+    if (choice == 'pdf') {
+        if (isEntry) {
+           await _printEntryReport(entries);
+        } else {
+           await _printReturnReport(returns);
+        }
+    } else if (choice == 'thermal') {
+        if (!mounted) return;
+        // Force dialog
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Menü Açılıyor...'), duration: Duration(milliseconds: 500)));
+        _showBluetoothDeviceDialog(isEntry ? entries : returns, isEntry);
+    }
+  }
+
+  void _showBluetoothDeviceDialog(List<PalletRecord> records, bool isEntry) {
+      // IMMEDIATE DIALOG to ensure UI feedback
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Termal Yazıcı Seçenekleri'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+               const Text('SP319 Yazıcınız için işlem seçiniz:'),
+               const SizedBox(height: 20),
+               ElevatedButton.icon(
+                 icon: const Icon(Icons.bolt),
+                 label: const Text('Doğrudan Bağlan (SP319)'),
+                 style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                 onPressed: () {
+                    Navigator.pop(ctx);
+                    // MAC from user's image
+                    _connectAndPrint("00:19:03:09:92:08", records, isEntry); 
+                 },
+               ),
+               const SizedBox(height: 10),
+               OutlinedButton.icon(
+                 icon: const Icon(Icons.search),
+                 label: const Text('Cihazları Ara / Listele'),
+                 style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                 onPressed: () {
+                    Navigator.pop(ctx);
+                    _scanAndShowList(records, isEntry);
+                 },
+               ),
+            ],
+          ),
+          actions: [
+            TextButton(child: const Text('İptal'), onPressed: () => Navigator.pop(ctx))
+          ],
+        )
+      );
+  }
+
+  void _scanAndShowList(List<PalletRecord> records, bool isEntry) async {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cihazlar aranıyor...'), duration: Duration(seconds: 1)));
+      
+      try {
+        // Request permissions
+        await [
+          Permission.bluetooth,
+          Permission.bluetoothScan,
+          Permission.bluetoothConnect,
+          Permission.location,
+        ].request();
+
+        List<BluetoothInfo> devices = await _thermalService.getBondedDevices();
+        if (!mounted) return;
+
+        if (devices.isEmpty) {
+           showDialog(
+             context: context,
+             builder: (ctx) => AlertDialog(
+               title: const Text('Liste Boş'),
+               content: const Text('Eşleşmiş cihaz bulunamadı. Lütfen "Doğrudan Bağlan" seçeneğini deneyin veya telefonunuzdan Bluetooth eşleştirmesini kontrol edin.'),
+               actions: [TextButton(child: const Text('Tamam'), onPressed: () => Navigator.pop(ctx))],
+             )
+           );
+           return;
+        }
+
+        showDialog(
+          context: context, 
+          builder: (ctx) => SimpleDialog(
+            title: const Text('Bulunan Cihazlar'),
+            children: devices.map((d) => SimpleDialogOption(
+               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+               child: Row(children: [
+                  const Icon(Icons.print, color: Colors.grey),
+                  const SizedBox(width: 10),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(d.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(d.macAdress, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ])
+               ]),
+               onPressed: () {
+                  Navigator.pop(ctx);
+                  _connectAndPrint(d.macAdress, records, isEntry);
+               },
+            )).toList(),
+          )
+        );
+      } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      }
+  }
+
+  void _connectAndPrint(String macAddress, List<PalletRecord> records, bool isEntry) async {
+     // Request permissions before connecting locally
+     await [
+        Permission.bluetooth,
+        Permission.bluetoothScan,
+        Permission.bluetoothConnect,
+        Permission.location,
+     ].request();
+
+     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bağlanıyor...'), duration: Duration(milliseconds: 1000)));
+
+     // Retry Logic: 3 attempts
+     bool connected = false;
+     for (int i = 0; i < 3; i++) {
+        // Disconnect first to ensure clean state
+        try { await _thermalService.disconnect(); } catch (_) {}
+        
+        if (i > 0) {
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Tekrar deneniyor (${i+1}/3)...'), duration: const Duration(milliseconds: 500)));
+           await Future.delayed(const Duration(seconds: 2));
+        }
+        
+        connected = await _thermalService.connect(macAddress);
+        if (connected) break;
+     }
+
+     if (connected) {
+         if (isEntry) await _thermalService.printEntryReport(records, _selectedDate);
+         else await _thermalService.printReturnReport(records, _selectedDate);
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Yazdırılıyor...')));
+     } else {
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bağlantı Başarısız! Yazıcıyı KAPATIP AÇIN ve tekrar deneyin.')));
+     }
   }
 
   Future<void> _printEntryReport(List<PalletRecord> records) async {
@@ -2354,6 +2438,7 @@ class ReturnScreen extends StatefulWidget {
 }
 
 class _ReturnScreenState extends State<ReturnScreen> {
+  final ThermalService _thermalService = ThermalService();
   DateTime _selectedDate = DateTime.now();
   final String _selectedFirm = 'BEYPILIC'; // Hardcoded
   String _selectedType = 'Tahta';
@@ -2440,7 +2525,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                _printReceipt();
+                _showPrintOptions();
               }, 
               child: const Text('Yazdır')
             )
@@ -2471,89 +2556,264 @@ class _ReturnScreenState extends State<ReturnScreen> {
     }
   }
 
+  void _showPrintOptions() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+         title: const Text('Yazdırma Seçeneği'),
+         content: Column(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             ListTile(
+               leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+               title: const Text('Normal (PDF)'),
+               onTap: () { Navigator.pop(ctx); _printReceipt(); },
+             ),
+             ListTile(
+               leading: const Icon(Icons.print, color: Colors.blue),
+               title: const Text('Termal Yazıcı'),
+               subtitle: const Text('SP319 (Bluetooth)'),
+               onTap: () { Navigator.pop(ctx); _handleThermalPrint(); },
+             )
+           ]
+         )
+      )
+    );
+  }
+
+  void _handleThermalPrint() {
+      // Force dialog
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Termal Yazıcı Seçenekleri'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+               const Text('SP319 Yazıcınız için işlem seçiniz:'),
+               const SizedBox(height: 20),
+               ElevatedButton.icon(
+                 icon: const Icon(Icons.bolt),
+                 label: const Text('Doğrudan Bağlan (SP319)'),
+                 style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                 onPressed: () {
+                    Navigator.pop(ctx);
+                    // MAC from user's image
+                    _connectAndPrint("00:19:03:09:92:08"); 
+                 },
+               ),
+               const SizedBox(height: 10),
+               OutlinedButton.icon(
+                 icon: const Icon(Icons.search),
+                 label: const Text('Cihazları Ara / Listele'),
+                 style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                 onPressed: () {
+                    Navigator.pop(ctx);
+                    _scanAndShowList();
+                 },
+               ),
+            ],
+          ),
+          actions: [
+            TextButton(child: const Text('İptal'), onPressed: () => Navigator.pop(ctx))
+          ],
+        )
+      );
+  }
+
+  void _scanAndShowList() async {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cihazlar aranıyor...'), duration: Duration(seconds: 1)));
+      
+      try {
+        await [
+          Permission.bluetooth,
+          Permission.bluetoothScan,
+          Permission.bluetoothConnect,
+          Permission.location,
+        ].request();
+
+        List<BluetoothInfo> devices = await _thermalService.getBondedDevices();
+        if (!mounted) return;
+
+        if (devices.isEmpty) {
+           showDialog(
+             context: context,
+             builder: (ctx) => AlertDialog(
+               title: const Text('Liste Boş'),
+               content: const Text('Eşleşmiş cihaz bulunamadı. Lütfen "Doğrudan Bağlan" seçeneğini deneyin.'),
+               actions: [TextButton(child: const Text('Tamam'), onPressed: () => Navigator.pop(ctx))],
+             )
+           );
+           return;
+        }
+
+        showDialog(
+          context: context, 
+          builder: (ctx) => SimpleDialog(
+            title: const Text('Bulunan Cihazlar'),
+            children: devices.map((d) => SimpleDialogOption(
+               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+               child: Row(children: [
+                  const Icon(Icons.print, color: Colors.grey),
+                  const SizedBox(width: 10),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(d.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(d.macAdress, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ])
+               ]),
+               onPressed: () {
+                  Navigator.pop(ctx);
+                  _connectAndPrint(d.macAdress);
+               },
+            )).toList(),
+          )
+        );
+      } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      }
+  }
+
+  void _connectAndPrint(String macAddress) async {
+     // Request permissions before connecting locally
+     await [
+        Permission.bluetooth,
+        Permission.bluetoothScan,
+        Permission.bluetoothConnect,
+        Permission.location,
+     ].request();
+
+     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bağlanıyor...'), duration: Duration(milliseconds: 1000)));
+
+     // Retry Logic: 3 attempts
+     bool connected = false;
+     for (int i = 0; i < 3; i++) {
+        // Disconnect first
+        try { await _thermalService.disconnect(); } catch (_) {}
+        
+        if (i > 0) {
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Tekrar deneniyor (${i+1}/3)...'), duration: const Duration(milliseconds: 500)));
+           await Future.delayed(const Duration(seconds: 2));
+        }
+        
+        connected = await _thermalService.connect(macAddress);
+        if (connected) break;
+     }
+     
+     if (connected) {
+         _printThermalReceipt();
+     } else {
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bağlantı Başarısız! Yazıcıyı KAPATIP AÇIN ve tekrar deneyin.')));
+     }
+  }
+
+  void _printThermalReceipt() async {
+      final count = int.tryParse(_countController.text) ?? 0;
+      final info = 'İade Eden: ${_returnerController.text} | Şoför: ${_driverController.text} | Plaka: ${_plateController.text}';
+      await _thermalService.printReturnReceipt(
+         _selectedFirm, 
+         _selectedType,
+         count,
+         DateFormat('dd.MM.yyyy').format(_selectedDate),
+         info
+      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Yazdırıldı')));
+  }
+
   Future<void> _printReceipt() async {
     final pdf = pw.Document();
     
-    // Use fallback font if assets not loaded properly or just standard
-    // Ideally we load Inter-Regular.ttf from assets if declared in pubspec
-    // We will attempt to use standard Helvetica for simplicity and speed if bold/regular concerns
-    // But user wants "Professional". 
-    // We'll stick to Printing package defaults which handle fonts gracefully usually. 
-    // Or use PdfGoogleFonts.
-    
     final font = await PdfGoogleFonts.robotoRegular();
     final fontBold = await PdfGoogleFonts.robotoBold();
+    final dateStr = DateFormat('dd.MM.yyyy').format(_selectedDate);
+
+    // Load Logo
+    final logoData = await rootBundle.load('assets/images/atilim_logo.png');
+    final logo = pw.MemoryImage(logoData.buffer.asUint8List());
+
+    final count = int.tryParse(_countController.text) ?? 0;
+    
+    // Logic to distinguish type counts for display
+    int totalPlastic = _selectedType == 'Plastik' ? count : 0;
+    int totalWood = _selectedType == 'Tahta' ? count : 0;
 
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(30),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Header(
-                level: 0, 
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('ATILIM GIDA', style: pw.TextStyle(font: fontBold, fontSize: 24)),
-                    pw.Text('PALET İADE FİŞİ', style: pw.TextStyle(font: fontBold, fontSize: 20)),
-                  ]
-                )
-              ),
-              pw.SizedBox(height: 20),
-              pw.Row(
+               // 1. Header with Logo (Matching Reports)
+               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  pw.Text('Tarih: ${DateFormat('dd.MM.yyyy').format(_selectedDate)}', style: pw.TextStyle(font: font, fontSize: 12)),
-                  pw.Text('Firma: $_selectedFirm', style: pw.TextStyle(font: fontBold, fontSize: 12)),
+                   pw.Image(logo, width: 120),
+                   pw.Column(
+                     crossAxisAlignment: pw.CrossAxisAlignment.end,
+                     children: [
+                       pw.Text('İADE PALET MAKBUZU', style: pw.TextStyle(font: fontBold, fontSize: 18, color: PdfColors.red800)),
+                       pw.Text('Tarih: $dateStr', style: pw.TextStyle(font: font, fontSize: 12, color: PdfColors.black)),
+                     ]
+                   )
                 ]
               ),
-              pw.Divider(),
+              pw.Divider(color: PdfColors.grey300, thickness: 1, height: 20),
               pw.SizedBox(height: 10),
-              pw.Text('TESLİMAT BİLGİLERİ', style: pw.TextStyle(font: fontBold, fontSize: 14)),
+
+              // 2. Summary Section
+              pw.Text('İADE EDİLEN:', style: pw.TextStyle(font: fontBold, fontSize: 14)),
               pw.SizedBox(height: 10),
+              if (totalPlastic > 0)
+                pw.Row(children: [
+                   pw.Text('PLASTİK:', style: pw.TextStyle(font: font, fontSize: 12)),
+                   pw.Spacer(),
+                   pw.Text('$totalPlastic ADET', style: pw.TextStyle(font: fontBold, fontSize: 14)),
+                ]),
+              if (totalWood > 0)
+                 pw.Row(children: [
+                   pw.Text('TAHTA:', style: pw.TextStyle(font: font, fontSize: 12)),
+                   pw.Spacer(),
+                   pw.Text('$totalWood ADET', style: pw.TextStyle(font: fontBold, fontSize: 14)),
+                ]),
+              pw.Divider(), 
               pw.Row(children: [
-                pw.Expanded(child: pw.Text('Teslim Eden: ${_returnerController.text}', style: pw.TextStyle(font: font))),
-                pw.Expanded(child: pw.Text('Şoför: ${_driverController.text}', style: pw.TextStyle(font: font))),
-                pw.Expanded(child: pw.Text('Araç Plaka: ${_plateController.text}', style: pw.TextStyle(font: font))),
+                   pw.Text('GENEL TOPLAM:', style: pw.TextStyle(font: fontBold, fontSize: 14)),
+                   pw.Spacer(),
+                   pw.Text('$count Palet', style: pw.TextStyle(font: fontBold, fontSize: 16)),
               ]),
+              pw.Divider(),
               pw.SizedBox(height: 20),
-              pw.Table.fromTextArray(
-                context: context,
-                border: pw.TableBorder.all(),
-                headerStyle: pw.TextStyle(font: fontBold, color: PdfColors.white),
-                cellStyle: pw.TextStyle(font: font),
-                headerDecoration: const pw.BoxDecoration(color: PdfColors.grey700),
-                data: <List<String>>[
-                  <String>['Palet Tipi', 'Adet'],
-                  <String>[_selectedType, _countController.text],
-                ]
-              ),
-              pw.SizedBox(height: 50),
+
+              // 3. Info Section (Matching Thermal Details)
+              pw.Text('TESLİMAT BİLGİLERİ:', style: pw.TextStyle(font: fontBold, fontSize: 14, decoration: pw.TextDecoration.underline)),
+              pw.SizedBox(height: 5),
+              pw.Text('Teslim Eden: ${_returnerController.text}', style: pw.TextStyle(font: font, fontSize: 12)),
+              pw.Text('Şoför: ${_driverController.text}', style: pw.TextStyle(font: font, fontSize: 12)),
+              pw.Text('Plaka: ${_plateController.text}', style: pw.TextStyle(font: font, fontSize: 12)),
+              
+              pw.SizedBox(height: 40),
+
+              // 4. Signatures (Left/Right)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Column(children: [
-                    pw.Text('TESLİM EDEN (Atılım Gıda)', style: pw.TextStyle(font: fontBold)),
-                    pw.SizedBox(height: 40),
-                    pw.Text('${_returnerController.text}', style: pw.TextStyle(font: font)),
-                    pw.Container(height: 1, width: 120, color: PdfColors.black),
-                    pw.Text('İmza', style: pw.TextStyle(font: font, fontSize: 10)),
-                  ]),
-                   pw.Column(children: [
-                    pw.Text('NAKLYİE / ŞOFÖR', style: pw.TextStyle(font: fontBold)),
-                    pw.SizedBox(height: 40),
-                    pw.Text('${_driverController.text}', style: pw.TextStyle(font: font)),
-                    pw.Container(height: 1, width: 120, color: PdfColors.black),
-                    pw.Text('İmza', style: pw.TextStyle(font: font, fontSize: 10)),
-                  ]),
-                  pw.Column(children: [
-                    pw.Text('TESLİM ALAN (BEYPİLİÇ)', style: pw.TextStyle(font: fontBold)),
-                    pw.SizedBox(height: 40),
-                    pw.Container(height: 1, width: 150, color: PdfColors.black),
-                     pw.Text('Ad Soyad / İmza', style: pw.TextStyle(font: font, fontSize: 10)),
-                  ]),
+                  pw.Column(
+                    children: [
+                       pw.Text('TESLİM EDEN', style: pw.TextStyle(font: fontBold, fontSize: 12)),
+                       pw.SizedBox(height: 40),
+                       pw.Text('( İmza )', style: pw.TextStyle(font: font, fontSize: 10)),
+                    ]
+                  ),
+                  pw.Column(
+                    children: [
+                       pw.Text('TESLİM ALAN', style: pw.TextStyle(font: fontBold, fontSize: 12)),
+                       pw.SizedBox(height: 40),
+                       pw.Text('( İmza )', style: pw.TextStyle(font: font, fontSize: 10)),
+                    ]
+                  )
                 ]
               )
             ]
@@ -2562,10 +2822,9 @@ class _ReturnScreenState extends State<ReturnScreen> {
       )
     );
 
-
     final bytes = await pdf.save();
-    final dateStr = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
-    await _savePdf(bytes, 'IadeFisi_$dateStr.pdf');
+    final fileStr = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
+    await _savePdf(bytes, 'IadeFisi_$fileStr.pdf');
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => bytes);
   }
 

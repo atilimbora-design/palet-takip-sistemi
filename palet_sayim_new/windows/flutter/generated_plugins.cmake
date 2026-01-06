@@ -4,6 +4,8 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
+  permission_handler_windows
+  print_bluetooth_thermal
   printing
   sqlite3_flutter_libs
 )

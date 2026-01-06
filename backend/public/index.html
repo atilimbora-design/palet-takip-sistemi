@@ -518,16 +518,20 @@
                     <div class="live-dot"></div> CANLI SİSTEM
                 </div>
                 <a href="reports.html" class="btn" style="background: rgba(255,255,255,0.1); color: white;"><i
-                        class="fas fa-file-alt"></i> Raporlar</a>
-                <button class="btn btn-danger btn-sm" onclick="exportToCSV()"><i class="fas fa-download"></i> Rapor
-                    İndir (CSV)</button>
-                <div
-                    style="border-left:1px solid rgba(255,255,255,0.2); padding-left:10px; margin-left:10px; display:flex;">
-                    <button class="nav-btn" onclick="openSettings()" title="Ayarlar"><i
-                            class="fa-solid fa-gear"></i></button>
-                    <button class="nav-btn" onclick="logout()" title="Çıkış" style="color:var(--danger)"><i
-                            class="fa-solid fa-right-from-bracket"></i></button>
-                </div>
+                        Raporlar</a>
+                        <button class="btn" onclick="openReturnModal()"
+                            style="background: rgba(249, 115, 22, 0.2); color: #fb923c; margin-left: 10px;"><i
+                                class="fas fa-truck-moving"></i> İade Çıkışı</button>
+                        <button class="btn btn-danger btn-sm" onclick="exportToCSV()"><i class="fas fa-download"></i>
+                            Rapor
+                            İndir (CSV)</button>
+                        <div
+                            style="border-left:1px solid rgba(255,255,255,0.2); padding-left:10px; margin-left:10px; display:flex;">
+                            <button class="nav-btn" onclick="openSettings()" title="Ayarlar"><i
+                                    class="fa-solid fa-gear"></i></button>
+                            <button class="nav-btn" onclick="logout()" title="Çıkış" style="color:var(--danger)"><i
+                                    class="fa-solid fa-right-from-bracket"></i></button>
+                        </div>
             </div>
         </header>
 
@@ -756,6 +760,51 @@
                     onclick="closeModal()">İptal</button>
                 <button class="btn btn-primary" onclick="saveEdit()"><i class="fas fa-save"></i> Değişiklikleri
                     Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RETURN MODAL -->
+    <div id="returnModal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 style="margin:0; font-size: 1.5rem; color: #fb923c;"><i class="fas fa-truck-moving"></i> İade Çıkışı
+                </h2>
+                <button class="btn-icon" style="background:transparent; color: var(--text-dim);"
+                    onclick="closeReturnModal()"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Firma Seçimi</label>
+                <select id="return-firm" class="form-control">
+                    <!-- Populated via JS -->
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Palet Tipi</label>
+                <select id="return-type" class="form-control">
+                    <option value="Tahta">Tahta</option>
+                    <option value="Plastik">Plastik</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">İade Adedi</label>
+                <input type="number" id="return-count" class="form-control" min="1" placeholder="Örn: 50">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">İade Notu / Açıklama</label>
+                <input type="text" id="return-note" class="form-control" placeholder="İade sebebi veya açıklama...">
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 30px;">
+                <button class="btn" style="background: rgba(255,255,255,0.05); color: white;"
+                    onclick="closeReturnModal()">İptal</button>
+                <button class="btn" style="background: #fb923c; color: white;" onclick="executeReturn()">
+                    <i class="fas fa-paper-plane"></i> İadeyi Tamamla
+                </button>
             </div>
         </div>
     </div>
@@ -1088,6 +1137,68 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+        }
+
+        // --- RETURN LOGIC ---
+        function openReturnModal() {
+            // Find firms that have items IN_STOCK
+            const stockItems = rawData.filter(r => r.status === 'IN_STOCK');
+            const firms = [...new Set(stockItems.map(r => r.firm_name))].sort();
+
+            const select = document.getElementById('return-firm');
+            select.innerHTML = '<option value="">Firma Seçiniz...</option>';
+
+            firms.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                opt.innerText = f;
+                select.appendChild(opt);
+            });
+
+            // Reset other fields
+            document.getElementById('return-count').value = '';
+            document.getElementById('return-note').value = '';
+
+            document.getElementById('returnModal').style.display = 'flex';
+        }
+
+        function closeReturnModal() {
+            document.getElementById('returnModal').style.display = 'none';
+        }
+
+        function executeReturn() {
+            const firm = document.getElementById('return-firm').value;
+            const type = document.getElementById('return-type').value;
+            const count = parseInt(document.getElementById('return-count').value);
+            const note = document.getElementById('return-note').value;
+
+            if (!firm || !type || isNaN(count) || count <= 0) {
+                showToast('Lütfen geçerli bir firma ve adet giriniz', 'error');
+                return;
+            }
+
+            // Optional: Check local data before sending to avoid server roundtrip for obvious errors
+            // But let server handle it for truth.
+
+            fetch('/api/return', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ firm_name: firm, pallet_type: type, count: count, note: note })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        showToast('Hata: ' + data.error, 'error');
+                    } else {
+                        showToast('İade işlemi başarılı (' + data.returned_count + ' adet)', 'success');
+                        closeReturnModal();
+                        fetchData(); // Refresh UI
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    showToast('Sunucu hatası', 'error');
+                });
         }
 
         // --- TOAST ---

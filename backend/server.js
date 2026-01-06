@@ -106,27 +106,28 @@ app.get('/api/pallets', (req, res) => {
 // 4. Return Pallets (Mock implementation for returning stock)
 // Senaryo 3: Palet İadesi
 app.post('/api/return', (req, res) => {
-    // Expects { firm_name: 'BEYPILIC', count: 50, pallet_type: 'Tahta'} 
-    // This logic might need refinement depending on specific business rules (FIFO vs specific ID)
-    // For now, we update the status of N items of that firm and type to 'RETURNED'
-    const { firm_name, count, pallet_type } = req.body;
+    // Expects { firm_name: 'BEYPILIC', count: 50, pallet_type: 'Tahta', note: 'İade açıklaması' } 
+    const { firm_name, count, pallet_type, note } = req.body;
 
     if (!firm_name || !count || !pallet_type) {
         return res.status(400).json({ error: 'Missing parameters' });
     }
 
     // Find available pallets (Type only, FIFO based on local_id/entry order implied by DB)
+    // IMPORTANT: specific firm!
     const sql = `SELECT local_id FROM pallets 
-                 WHERE pallet_type = ? 
+                 WHERE firm_name = ?
+                 AND pallet_type = ? 
                  AND status = 'IN_STOCK' 
+                 ORDER BY entry_date ASC
                  LIMIT ?`;
 
-    db.all(sql, [pallet_type, count], (err, rows) => {
+    db.all(sql, [firm_name, pallet_type, count], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
 
         if (rows.length < count) {
             return res.status(400).json({
-                error: 'Not enough stock to return',
+                error: 'Yeterli stok yok',
                 requested: count,
                 available: rows.length
             });
@@ -135,9 +136,12 @@ app.post('/api/return', (req, res) => {
         const idsToUpdate = rows.map(r => r.local_id);
         const placeholders = idsToUpdate.map(() => '?').join(',');
 
-        const updateSql = `UPDATE pallets SET status = 'RETURNED' WHERE local_id IN (${placeholders})`;
+        const updateSql = `UPDATE pallets SET status = 'RETURNED', note = ? WHERE local_id IN (${placeholders})`;
 
-        db.run(updateSql, idsToUpdate, function (err) {
+        // params for update: note, followed by all ids
+        const params = [note || '', ...idsToUpdate];
+
+        db.run(updateSql, params, function (err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({
                 message: 'Pallets returned successfully',

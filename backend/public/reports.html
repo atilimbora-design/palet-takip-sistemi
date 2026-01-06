@@ -313,7 +313,14 @@
                 // Logic for returns: Status IS returned AND (Note has date OR entry_date is today??)
                 // Ideally we should have a 'return_date' column. The mobile app uses 'note' hack or 'entry_date' if returned same day.
                 // We will stick to Mobile Logic: note starts with YYYY-MM-DD
-                list = allData.filter(r => r.status === 'RETURNED' && (r.note && r.note.startsWith(date)));
+                list = allData.filter(r => {
+                    if (r.status !== 'RETURNED') return false;
+                    // Priority: explicit return_date column
+                    if (r.return_date === date) return true;
+                    // Fallback: Legacy mobile app behavior (Date in note)
+                    if (r.note && r.note.startsWith(date)) return true;
+                    return false;
+                });
             }
 
             // Sort by Time

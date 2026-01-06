@@ -603,56 +603,44 @@
 
         <!-- KPI CARDS -->
         <div class="dashboard-grid">
-            <!-- Card 1: Hand Stock -->
+            <!-- Card 1: Eldeki Plastik Stok -->
             <div class="stat-card" style="border-left: 4px solid var(--primary);">
                 <div class="stat-card-icon" style="background: var(--primary-light); color: var(--primary);">
                     <i class="fas fa-cubes"></i>
                 </div>
-                <div class="stat-label">Eldeki Stok</div>
-                <div class="stat-value" id="kpi-stock">0</div>
+                <div class="stat-label">Eldeki Plastik Stok</div>
+                <div class="stat-value" id="kpi-stock-plastic">0</div>
                 <div class="stat-sub">
-                    <span style="color: #60a5fa;"><i class="fas fa-square"></i> <strong id="kpi-plastic">0</strong>
-                        Plastik</span>
-                    <span style="color: #fbbf24; margin-left:10px;"><i class="fas fa-square"></i> <strong
-                            id="kpi-wood">0</strong> Tahta</span>
+                    <span style="color: var(--text-muted);">Adet</span>
                 </div>
             </div>
 
-            <!-- Card 2: Today's Entries -->
+            <!-- Card 2: Bugün Gelen Detayı -->
             <div class="stat-card" style="border-left: 4px solid var(--success);">
                 <div class="stat-card-icon" style="background: var(--success-light); color: var(--success);">
-                    <i class="fas fa-arrow-down"></i>
+                    <i class="fas fa-calendar-day"></i>
                 </div>
                 <div class="stat-label">Bugün Gelen</div>
-                <div class="stat-value" id="kpi-today-in" style="color: var(--success);">0</div>
-                <div class="stat-sub">
-                    <span>Son 24 saat içinde giriş yapılan</span>
+                <div class="stat-value"
+                    style="font-size:1.1rem; display:flex; flex-direction:column; gap:2px; font-weight:600;">
+                    <div style="color:var(--text-main);"><span id="today-plastic">0</span> Plastik</div>
+                    <div style="color:var(--text-main);"><span id="today-wood">0</span> Tahta</div>
+                    <div style="color:var(--text-muted); font-size:0.9rem;"><span id="today-boxes">0</span> Koli</div>
                 </div>
             </div>
 
-            <!-- Card 3: Total Returns -->
+            <!-- Card 3: Bugün İade -->
             <div class="stat-card" style="border-left: 4px solid var(--orange-brand);">
                 <div class="stat-card-icon" style="background: rgba(234, 88, 12, 0.1); color: var(--orange-brand);">
-                    <i class="fas fa-arrow-up"></i>
+                    <i class="fas fa-truck-ramp-box"></i>
                 </div>
-                <div class="stat-label">Toplam İade</div>
-                <div class="stat-value" id="kpi-returns" style="color: var(--orange-brand);">0</div>
+                <div class="stat-label">İade</div>
+                <div class="stat-value" id="kpi-returns">0</div>
                 <div class="stat-sub">
-                    <span>Tüm zamanların iade toplamı</span>
+                    <span>Çıkış işlemi</span>
                 </div>
             </div>
-
-            <!-- Card 4: Total Volume -->
-            <div class="stat-card" style="border-left: 4px solid #8b5cf6;">
-                <div class="stat-card-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
-                    <i class="fas fa-box-open"></i>
-                </div>
-                <div class="stat-label">Stoktaki Koli</div>
-                <div class="stat-value" id="kpi-boxes">0</div>
-                <div class="stat-sub">
-                    <span>Paletteki toplam ürün</span>
-                </div>
-            </div>
+        </div>
         </div>
 
         <!-- CHARTS & TABLE -->
@@ -815,20 +803,22 @@
             const todayStr = new Date().toISOString().split('T')[0];
             const todayEntries = allData.filter(d => d.entry_date === todayStr);
 
-            // Stock Details
+            // Stock Details (IN STOCK)
             const plasticStock = inStock.filter(d => d.pallet_type === 'Plastik').length;
-            const woodStock = inStock.filter(d => d.pallet_type === 'Tahta').length;
-            const totalBoxes = inStock.reduce((acc, curr) => acc + (curr.box_count || 0), 0);
+
+            // Today Entries Details
+            const todayPlastic = todayEntries.filter(d => d.pallet_type === 'Plastik').length;
+            const todayWood = todayEntries.filter(d => d.pallet_type === 'Tahta').length;
+            const todayBoxes = todayEntries.reduce((acc, curr) => acc + (curr.box_count || 0), 0);
 
             // Update DOM
-            document.getElementById('kpi-stock').innerText = inStock.length;
-            document.getElementById('kpi-plastic').innerText = plasticStock;
-            document.getElementById('kpi-wood').innerText = woodStock;
+            document.getElementById('kpi-stock-plastic').innerText = plasticStock;
 
-            document.getElementById('kpi-today-in').innerText = todayEntries.length;
+            document.getElementById('today-plastic').innerText = todayPlastic;
+            document.getElementById('today-wood').innerText = todayWood;
+            document.getElementById('today-boxes').innerText = todayBoxes.toLocaleString();
+
             document.getElementById('kpi-returns').innerText = returns.length;
-
-            document.getElementById('kpi-boxes').innerText = totalBoxes.toLocaleString();
 
             // 2. Render Table
             renderTable();

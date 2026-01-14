@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'main.dart';
 
@@ -66,6 +67,10 @@ class _LoginScreenState extends State<LoginScreen> {
       ).timeout(const Duration(seconds: 5));
       
       if (response.statusCode == 200) {
+        // Save username to SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('current_user', _selectedUser!);
+        
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const DashboardScreen()),
@@ -79,6 +84,10 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
        // Fallback for Offline
        if( _passwordController.text == '1234' ) {
+          // Save username to SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('current_user', _selectedUser!);
+          
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const DashboardScreen()),
           );

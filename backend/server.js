@@ -190,6 +190,31 @@ app.post('/api/return', (req, res) => {
     });
 });
 
+
+// 4b. Return Pallets by specific IDs (Exact Sync)
+app.post('/api/return-batch', (req, res) => {
+    // Expects { ids: ['uuid1', 'uuid2'], note: 'Info', date: '2023-01-01' }
+    const { ids, note, date } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'Missing or invalid IDs' });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const updateSql = `UPDATE pallets SET status = 'RETURNED', note = ?, return_date = ? WHERE local_id IN (${placeholders})`;
+
+    // params: note, date, followed by all ids
+    const params = [note || '', date, ...ids];
+
+    db.run(updateSql, params, function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({
+            message: 'Batch return processed',
+            updated_count: this.changes
+        });
+    });
+});
+
 // 5. Delete Pallet
 app.delete('/api/pallets/:id', (req, res) => {
     const { id } = req.params;

@@ -297,7 +297,7 @@ class DatabaseHelper {
     return Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM pallets WHERE status = 'IN_STOCK' AND pallet_type = 'Plastik'")) ?? 0;
   }
 
-  Future<String> processReturn(String type, int count, String date, String info) async {
+  Future<Object> processReturn(String type, int count, String date, String info) async {
     final db = await instance.database;
     
     // Find candidate records to return (FIFO or just any IN_STOCK of that type)
@@ -316,17 +316,21 @@ class DatabaseHelper {
     }
 
     final batch = db.batch();
+    final List<String> affectedIds = [];
+    
     for (var row in candidates) {
+      final id = row['local_id'] as String;
+      affectedIds.add(id);
       batch.update(
         'pallets',
-        {'status': 'RETURNED', 'note': info, 'return_date': date}, // Update status, add note and return_date
+        {'status': 'RETURNED', 'note': info, 'return_date': date}, 
         where: 'local_id = ?',
-        whereArgs: [row['local_id']]
+        whereArgs: [id]
       );
     }
     
     await batch.commit();
-    return 'OK';
+    return affectedIds;
   }
 
   Future<void> seedDummyData() async {
@@ -2549,16 +2553,16 @@ class _ReturnScreenState extends State<ReturnScreen> {
 
   bool _isLoading = false;
 
-  Future<void> _syncReturnFromServer(String firm, String type, int count) async {
+  Future<void> _syncReturnFromServer(List<String> ids, String info, String date) async {
     try {
-      final url = Uri.parse('${AppConfig.baseUrl}/api/return');
+      final url = Uri.parse('${AppConfig.baseUrl}/api/return-batch'); // New Endpoint
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'firm_name': firm,
-          'pallet_type': type,
-          'count': count
+          'ids': ids,
+          'note': info,
+          'date': date
         }),
       );
 
@@ -2597,14 +2601,20 @@ class _ReturnScreenState extends State<ReturnScreen> {
     );
 
     // Sync with Server (Fire and Forget)
-    if (res == 'OK') {
-      _syncReturnFromServer(_selectedFirm, _selectedType, count);
+    if (res is List<String>) {
+      _syncReturnFromServer(res, info, DateFormat('yyyy-MM-dd').format(_selectedDate));
+    } else if (res is String) {
+        // Error message (Yetersiz Stok vb.)
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res)));
+        setState(() => _isLoading = false);
+        return;
     }
 
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (res == 'OK') {
+    if (res is List<String>) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('İade İşlemi Başarılı!'), backgroundColor: AppColors.success));
       
       showDialog(

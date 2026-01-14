@@ -4,12 +4,17 @@ Bu doküman, "Palet Takip Sistemi" projesinin tüm teknik detaylarını, şifrel
 
 ---
 
-## 🏗️ 1. Sistem Mimarisi
+## 🏗️ 1. Sistem Mimarisi ve Deployment Kuralı (ÖNEMLİ ⚠️)
+
+**Bu proje Raspberry Pi 5 üzerinde Coolify ile çalışır.** 
+*   **Geliştirme:** Windows PC'de yapılır.
+*   **Deploy:** Kod GitHub'a pushlanır -> Coolify otomatik çeker ve sunucuyu günceller.
+*   **KURAL:** Windows'ta `node server.js` veya script çalıştırmak **SADECE LOCALİ ETKİLER**. Pi üzerindeki sunucuya müdahale etmek için **API Endpoints** kullanılmalı veya Coolify paneline gidilmelidir.
 
 Sistem üç ana parçadan oluşur:
-1.  **Backend (Sunucu):** Raspberry Pi üzerinde çalışan Node.js sunucusu. Veritabanını yönetir ve API sağlar.
-2.  **Frontend (Web Paneli):** Tarayıcı üzerinden erişilen yönetim paneli. Anlık stokları ve raporları gösterir.
-3.  **Mobil Uygulama (Flutter):** Personelin sahada palet girişi ve iadesi yaptığı Android uygulaması.
+1.  **Backend (Sunucu):** Raspberry Pi üzerinde çalışan Node.js sunucusu.
+2.  **Frontend (Web Paneli):** Tarayıcı erişimi.
+3.  **Mobil Uygulama (Flutter):** Android APK.
 
 ### 🌐 Erişim Bilgileri
 *   **Web Paneli Adresi:** [https://paletsayim.atilimgida.com](https://paletsayim.atilimgida.com) (Local Ağ: `http://192.168.1.104:3000`)
@@ -66,7 +71,19 @@ Mobil uygulama ve Web paneli aşağıdaki adreslerle haberleşir.
 
 ### ⚠️ Admin / Temizlik (Tehlikeli)
 *   `GET /api/admin/clear-today`: Sadece **BUGÜN** girilen verileri siler ve bugün yapılan iadeleri geri alır.
-*   `GET /api/admin/clear-all`: **TÜM VERİTABANINI SİLER.** (DİKKAT!)
+### 3. API Endpoints
+Base URL: `http://192.168.1.104:3000` (veya `http://paletsayim.atilimgida.com`)
+
+| Method | Endpoint | Açıklama |
+|--------|----------|----------|
+| GET | `/api/status` | Sunucu durumu (Health check) |
+| GET | `/api/sync` | Son senkronizasyondan sonra değişen/eklenen kayıtları çeker (`?last_sync=...`) |
+| GET | `/api/sync-all` | Tüm kayıtları çeker (Full sync) |
+| POST | `/api/entry` | Palet girişi yapar (Entry) - *Artık kullanılmıyor, sync ile yapılıyor* |
+| POST | `/api/return` | Palet çıkışı yapar (Legacy - FIFO bazlı) |
+| POST | `/api/return-batch` | **[YENİ]** Palet çıkışı yapar (ID bazlı - Kesin Eşleşme) |
+| GET | `/api/pallets` | Web dashboard için tüm kayıtları listeler |
+| GET | `/api/admin/clear-all`| Veritabanını tamamen temizler |
 
 ---
 

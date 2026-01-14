@@ -565,7 +565,10 @@
             <a href="#" class="nav-item active"><i class="fas fa-chart-pie"></i> Ana Panel (Dashboard)</a>
             <a href="reports.html" class="nav-item"><i class="fas fa-file-invoice"></i> Raporlar</a>
             <a href="#" class="nav-item" onclick="comingSoon()"><i class="fas fa-users"></i> Personel</a>
-            <a href="#" class="nav-item" onclick="openSettings()"><i class="fas fa-cog"></i> Ayarlar</a>
+            <!-- Danger Zone -->
+            <a href="#" class="nav-item" style="color: #ef4444; margin-top: 20px;" onclick="resetServerDB()">
+                <i class="fas fa-trash-alt"></i> SUNUCUYU SIFIRLA
+            </a>
         </nav>
 
         <div class="user-panel">
@@ -996,6 +999,29 @@
             t.querySelector('i').style.color = type === 'ok' ? 'var(--success)' : 'var(--danger)';
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        function comingSoon() {
+            showToast('Bu özellik yakında eklenecek.', 'warn');
+        }
+
+        async function resetServerDB() {
+            const confirm1 = confirm("⚠️ DİKKAT!\n\nSunucudaki TÜM VERİLER silinecek.\nBunu yapmak istediğinize emin misiniz?");
+            if (!confirm1) return;
+
+            const confirm2 = confirm("❌ SON UYARI!\n\nBu işlem geri alınamaz. Mobil uygulamadaki verilerle uyuşmazlık olabilir (Mobilden de sıfırlamanız gerekir).\n\nDevam edilsin mi?");
+            if (!confirm2) return;
+
+            try {
+                showToast('Sunucu sıfırlanıyor...', 'warn');
+                const res = await fetch('/api/admin/clear-all');
+                const data = await res.json();
+
+                alert("✅ İŞLEM BAŞARILI\n\nSunucu sıfırlandı. Sayfa yenileniyor.");
+                window.location.reload();
+            } catch (e) {
+                alert("HATA: Sunucuya ulaşılamadı. " + e);
+            }
         }
 
         function logout() {
